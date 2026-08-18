@@ -174,11 +174,16 @@ poetry.toml
 pyrightconfig.json
 
 # AI
-.agents
-.claude
-.idea
-.impeccable
-.kilo
-.opencode
-.pi
-.trae
+.DS_Store
+AGENTS.md
+.agents/
+.claude/
+.codex/
+.idea/
+.impeccable/
+.kilo/
+.opencode/
+.pi/
+.specify/
+.trae/
+agent/

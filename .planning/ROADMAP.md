@@ -6,7 +6,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Runnable Skeleton and Config** - Reviewer can install, configure, and launch the local app shell.
+- [x] **Phase 1: Runnable Skeleton and Config** - Reviewer can install, configure, and launch the local app shell.
 - [ ] **Phase 2: Streaming Inference Evidence** - User can run a live streaming OpenRouter request with basic telemetry.
 - [ ] **Phase 3: Routing and Fallback Demo** - User can compare routing strategies and inspect reproducible fallback behavior.
 - [ ] **Phase 4: Telemetry, Repeat, and Observability** - User can compare runs with honest metadata, repeat/cache observations, and optional Langfuse traces.
@@ -33,15 +33,15 @@
 Plans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Verify package legitimacy gate before dependency resolution.
+- [x] 01-01-PLAN.md — Verify package legitimacy gate before dependency resolution.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Create install, env config, setup docs, and NiceGUI launch tracer.
+- [x] 01-02-PLAN.md — Create install, env config, setup docs, and NiceGUI launch tracer.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-03-PLAN.md — Add importable package boundaries and non-live guard tests.
+- [x] 01-03-PLAN.md — Add importable package boundaries and non-live guard tests.
 
 **UI hint**: yes
 

@@ -1,0 +1,77 @@
+import importlib
+
+import pytest
+
+from openrouter_demo.client import PhaseNotImplementedError as ClientNotImplemented
+from openrouter_demo.client import stream_chat_completion
+from openrouter_demo.config import (
+    LANGFUSE_BASE_URL,
+    LANGFUSE_PUBLIC_KEY,
+    LANGFUSE_SECRET_KEY,
+    load_config,
+)
+from openrouter_demo.evals import PhaseNotImplementedError as EvalsNotImplemented
+from openrouter_demo.evals import main as evals_main
+from openrouter_demo.models import UNAVAILABLE, Unavailable
+from openrouter_demo.routing import ROUTING_STRATEGY_LABELS
+from openrouter_demo.scenarios import PhaseNotImplementedError as ScenarioNotImplemented
+from openrouter_demo.scenarios import run_scenario
+from openrouter_demo.telemetry import trace_readiness_from_config
+
+
+def test_required_modules_import() -> None:
+    for name in (
+        "openrouter_demo",
+        "openrouter_demo.client",
+        "openrouter_demo.config",
+        "openrouter_demo.evals",
+        "openrouter_demo.models",
+        "openrouter_demo.routing",
+        "openrouter_demo.scenarios",
+        "openrouter_demo.telemetry",
+        "openrouter_demo.ui",
+    ):
+        assert importlib.import_module(name)
+
+
+def test_live_boundaries_raise_honest_phase_errors() -> None:
+    with pytest.raises(ClientNotImplemented, match="Phase 2"):
+        stream_chat_completion()
+    with pytest.raises(ScenarioNotImplemented, match="later phases"):
+        run_scenario()
+    with pytest.raises(EvalsNotImplemented, match="Phase 5"):
+        evals_main()
+
+
+def test_routing_labels_do_not_claim_provider_results() -> None:
+    assert ROUTING_STRATEGY_LABELS == {
+        "default": "Default",
+        "cost": "Cost optimized",
+        "latency": "Latency optimized",
+        "custom": "Custom",
+    }
+
+
+def test_unavailable_metadata_is_not_zero() -> None:
+    assert isinstance(UNAVAILABLE, Unavailable)
+    assert UNAVAILABLE != 0
+    assert not UNAVAILABLE
+
+
+def test_trace_readiness_uses_config_without_creating_traces() -> None:
+    disabled = trace_readiness_from_config(load_config({}))
+    enabled = trace_readiness_from_config(load_config({
+        LANGFUSE_PUBLIC_KEY: "pk",
+        LANGFUSE_SECRET_KEY: "sk",
+        LANGFUSE_BASE_URL: "https://cloud.langfuse.com",
+    }))
+    assert disabled.enabled is False
+    assert enabled.enabled is True
+
+
+def test_evals_directory_has_no_phase1_cases() -> None:
+    assert Path("evals/.gitkeep").exists()
+    assert not Path("evals/cases.json").exists()
+
+
+from pathlib import Path

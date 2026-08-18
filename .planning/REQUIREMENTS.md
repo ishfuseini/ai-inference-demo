@@ -7,12 +7,12 @@
 
 ### Setup and Configuration
 
-- [ ] **SETUP-01**: Reviewer can install project dependencies with `uv sync`.
-- [ ] **SETUP-02**: Reviewer can launch the NiceGUI app with `uv run python app.py`.
-- [ ] **SETUP-03**: Reviewer can configure the required `OPENROUTER_API_KEY` without committing secrets.
-- [ ] **SETUP-04**: Reviewer can omit Langfuse credentials and still run the core inference demo.
-- [ ] **SETUP-05**: App shows clear setup guidance when the required OpenRouter credential is missing.
-- [ ] **SETUP-06**: Repository includes a Python package layout that separates UI, client, routing, scenarios, telemetry, evals, and typed models.
+- [x] **SETUP-01**: Reviewer can install project dependencies with `uv sync`.
+- [x] **SETUP-02**: Reviewer can launch the NiceGUI app with `uv run python app.py`.
+- [x] **SETUP-03**: Reviewer can configure the required `OPENROUTER_API_KEY` without committing secrets.
+- [x] **SETUP-04**: Reviewer can omit Langfuse credentials and still run the core inference demo.
+- [x] **SETUP-05**: App shows clear setup guidance when the required OpenRouter credential is missing.
+- [x] **SETUP-06**: Repository includes a Python package layout that separates UI, client, routing, scenarios, telemetry, evals, and typed models.
 
 ### Streaming Inference
 
@@ -89,12 +89,12 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SETUP-01 | Phase 1 | Pending |
-| SETUP-02 | Phase 1 | Pending |
-| SETUP-03 | Phase 1 | Pending |
-| SETUP-04 | Phase 1 | Pending |
-| SETUP-05 | Phase 1 | Pending |
-| SETUP-06 | Phase 1 | Pending |
+| SETUP-01 | Phase 1 | Complete |
+| SETUP-02 | Phase 1 | Complete |
+| SETUP-03 | Phase 1 | Complete |
+| SETUP-04 | Phase 1 | Complete |
+| SETUP-05 | Phase 1 | Complete |
+| SETUP-06 | Phase 1 | Complete |
 | INF-01 | Phase 2 | Pending |
 | INF-02 | Phase 2 | Pending |
 | INF-03 | Phase 2 | Pending |

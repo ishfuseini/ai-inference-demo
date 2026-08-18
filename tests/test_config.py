@@ -30,13 +30,28 @@ def test_load_config_reads_os_environ(monkeypatch) -> None:
 
 def test_langfuse_ready_requires_all_optional_vars() -> None:
     incomplete = load_config({LANGFUSE_PUBLIC_KEY: "pk"})
+    only_secret = load_config({
+        LANGFUSE_PUBLIC_KEY: "pk",
+        LANGFUSE_SECRET_KEY: "sk",
+    })
+    only_base_url = load_config({
+        LANGFUSE_PUBLIC_KEY: "pk",
+        LANGFUSE_BASE_URL: "https://cloud.langfuse.com",
+    })
     complete = load_config({
         LANGFUSE_PUBLIC_KEY: "pk",
         LANGFUSE_SECRET_KEY: "sk",
         LANGFUSE_BASE_URL: "https://cloud.langfuse.com",
     })
+
     assert incomplete.langfuse_ready is False
+    assert set(incomplete.missing_langfuse) == {LANGFUSE_SECRET_KEY, LANGFUSE_BASE_URL}
+    assert only_secret.langfuse_ready is False
+    assert only_secret.missing_langfuse == (LANGFUSE_BASE_URL,)
+    assert only_base_url.langfuse_ready is False
+    assert only_base_url.missing_langfuse == (LANGFUSE_SECRET_KEY,)
     assert complete.langfuse_ready is True
+    assert complete.missing_langfuse == ()
 
 
 def test_env_example_is_only_empty_assignments() -> None:

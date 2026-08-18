@@ -1,9 +1,8 @@
 import importlib
+from pathlib import Path
 
 import pytest
 
-from openrouter_demo.client import PhaseNotImplementedError as ClientNotImplemented
-from openrouter_demo.client import stream_chat_completion
 from openrouter_demo.config import (
     LANGFUSE_BASE_URL,
     LANGFUSE_PUBLIC_KEY,
@@ -25,6 +24,7 @@ def test_required_modules_import() -> None:
         "openrouter_demo.client",
         "openrouter_demo.config",
         "openrouter_demo.evals",
+        "openrouter_demo.history",
         "openrouter_demo.models",
         "openrouter_demo.routing",
         "openrouter_demo.scenarios",
@@ -35,8 +35,6 @@ def test_required_modules_import() -> None:
 
 
 def test_live_boundaries_raise_honest_phase_errors() -> None:
-    with pytest.raises(ClientNotImplemented, match="Phase 2"):
-        stream_chat_completion()
     with pytest.raises(ScenarioNotImplemented, match="later phases"):
         run_scenario()
     with pytest.raises(EvalsNotImplemented, match="Phase 5"):
@@ -72,6 +70,3 @@ def test_trace_readiness_uses_config_without_creating_traces() -> None:
 def test_evals_directory_has_no_phase1_cases() -> None:
     assert Path("evals/.gitkeep").exists()
     assert not Path("evals/cases.json").exists()
-
-
-from pathlib import Path

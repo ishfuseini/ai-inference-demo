@@ -26,7 +26,11 @@
   3. Missing `OPENROUTER_API_KEY` produces clear setup guidance instead of an attempted live call.
   4. Missing Langfuse credentials do not block app launch.
   5. Source layout separates UI, client, routing, scenarios, telemetry, evals, and typed models.
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 01-01-PLAN.md — Verify package legitimacy gate before dependency resolution.
+- [ ] 01-02-PLAN.md — Create install, env config, setup docs, and NiceGUI launch tracer.
+- [ ] 01-03-PLAN.md — Add importable package boundaries and non-live guard tests.
 **UI hint**: yes
 
 ### Phase 2: Streaming Inference Evidence

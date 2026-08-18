@@ -1,0 +1,139 @@
+# Requirements: OpenRouter Production Inference Lab
+
+**Defined:** 2026-08-18
+**Core Value:** Make production inference behavior visible and defensible in a five-minute interview demo.
+
+## v1 Requirements
+
+### Setup and Configuration
+
+- [ ] **SETUP-01**: Reviewer can install project dependencies with `uv sync`.
+- [ ] **SETUP-02**: Reviewer can launch the NiceGUI app with `uv run python app.py`.
+- [ ] **SETUP-03**: Reviewer can configure the required `OPENROUTER_API_KEY` without committing secrets.
+- [ ] **SETUP-04**: Reviewer can omit Langfuse credentials and still run the core inference demo.
+- [ ] **SETUP-05**: App shows clear setup guidance when the required OpenRouter credential is missing.
+- [ ] **SETUP-06**: Repository includes a Python package layout that separates UI, client, routing, scenarios, telemetry, evals, and typed models.
+
+### Streaming Inference
+
+- [ ] **INF-01**: User can enter or use a prompt and run a live OpenRouter chat completion.
+- [ ] **INF-02**: User can see response text appear progressively while the model streams.
+- [ ] **INF-03**: Completed run displays selected strategy and actual model/provider evidence when available.
+- [ ] **INF-04**: Completed run displays observed latency and success/failure state.
+- [ ] **INF-05**: Completed run displays token and cost metadata when available.
+- [ ] **INF-06**: UI clearly distinguishes unavailable metadata from zero values.
+
+### Routing and Fallback
+
+- [ ] **ROUTE-01**: User can choose at least default, cost-oriented, and latency-oriented routing strategies.
+- [ ] **ROUTE-02**: UI explains each strategy tradeoff before a run.
+- [ ] **ROUTE-03**: Completed run shows the selected strategy and the actual route/model evidence returned by the request.
+- [ ] **ROUTE-04**: User can trigger a reproducible fallback scenario.
+- [ ] **ROUTE-05**: Fallback scenario shows the failed primary attempt, failure reason or timeout, fallback route, and final result.
+- [ ] **ROUTE-06**: Successful fallback does not hide primary failure evidence.
+
+### Telemetry, Repeat, and Observability
+
+- [ ] **OBS-01**: App records normalized telemetry for every run, including model/provider, latency, tokens, cost, fallback, cache/repeat, and trace state fields.
+- [ ] **OBS-02**: App opts into OpenRouter router metadata where useful and handles its absence.
+- [ ] **OBS-03**: Repeat/cache scenario reports provider cache metadata only when available.
+- [ ] **OBS-04**: Repeat/cache scenario reports observed repeat latency and cost when cache metadata is unavailable.
+- [ ] **OBS-05**: App creates Langfuse traces for demo calls when Langfuse credentials are configured.
+- [ ] **OBS-06**: App visibly marks tracing disabled when Langfuse credentials are absent.
+- [ ] **OBS-07**: Recent run history allows comparison of completed runs in the main UI.
+
+### Evals
+
+- [ ] **EVAL-01**: Eval command or scenario runs three to five deterministic eval cases.
+- [ ] **EVAL-02**: Each eval case has a clear pass/fail rule.
+- [ ] **EVAL-03**: Eval output includes model or strategy used, pass/fail result, and score reason.
+- [ ] **EVAL-04**: Eval output includes latency and token/cost metadata when available.
+- [ ] **EVAL-05**: Eval output includes Langfuse trace IDs or disabled tracing state as appropriate.
+- [ ] **EVAL-06**: Eval summary supports comparison across at least two strategies or models.
+
+### Interview Walkthrough and Quality
+
+- [ ] **DOC-01**: README explains the demo story, setup, env vars, and five-minute walkthrough.
+- [ ] **DOC-02**: Repository includes an architecture guide focused on routing, fallback, latency, cost, telemetry, and eval flow.
+- [ ] **DOC-03**: Repository includes a failure tree covering client, credential, request, provider, routing, timeout, telemetry, and display failures.
+- [ ] **DOC-04**: UI avoids chatbot framing and keeps inference operation as the main product metaphor.
+- [ ] **DOC-05**: Focused tests cover response/error handling, routing configuration, telemetry normalization, and eval scoring.
+- [ ] **DOC-06**: `uv run pytest` passes.
+- [ ] **DOC-07**: `uv run ruff check .` passes.
+- [ ] **DOC-08**: Reviewer can run the core demo with only `OPENROUTER_API_KEY`.
+
+## v2 Requirements
+
+### Optional Enhancements
+
+- **V2-01**: Add optional LLM-as-judge scoring after deterministic evals are stable.
+- **V2-02**: Add Docker as a convenience path without replacing `uv`.
+- **V2-03**: Add richer architecture diagrams if they strengthen the interview story.
+- **V2-04**: Add more eval cases only if they remain cheap and inspectable.
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Authentication | Local interview demo does not need users or accounts. |
+| Multi-tenancy | Would turn the artifact into a product instead of a focused demo. |
+| Database persistence | Runtime history can stay in memory; eval cases can be checked-in files. |
+| Background job queue | Eval set is intentionally small and synchronous enough for v1. |
+| Separate JavaScript frontend | Violates the Python-first, inspectable repo constraint. |
+| Separate API service | NiceGUI is enough for the local browser UI; no product API is needed. |
+| Hosted deployment | Interview proof is local-first. |
+| Full eval platform | Deterministic evals are the v1 scope. |
+| Guaranteed cache hit claims | Cache behavior depends on provider/route metadata and must be reported honestly. |
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| SETUP-01 | Phase 1 | Pending |
+| SETUP-02 | Phase 1 | Pending |
+| SETUP-03 | Phase 1 | Pending |
+| SETUP-04 | Phase 1 | Pending |
+| SETUP-05 | Phase 1 | Pending |
+| SETUP-06 | Phase 1 | Pending |
+| INF-01 | Phase 2 | Pending |
+| INF-02 | Phase 2 | Pending |
+| INF-03 | Phase 2 | Pending |
+| INF-04 | Phase 2 | Pending |
+| INF-05 | Phase 2 | Pending |
+| INF-06 | Phase 2 | Pending |
+| ROUTE-01 | Phase 3 | Pending |
+| ROUTE-02 | Phase 3 | Pending |
+| ROUTE-03 | Phase 3 | Pending |
+| ROUTE-04 | Phase 3 | Pending |
+| ROUTE-05 | Phase 3 | Pending |
+| ROUTE-06 | Phase 3 | Pending |
+| OBS-01 | Phase 4 | Pending |
+| OBS-02 | Phase 4 | Pending |
+| OBS-03 | Phase 4 | Pending |
+| OBS-04 | Phase 4 | Pending |
+| OBS-05 | Phase 4 | Pending |
+| OBS-06 | Phase 4 | Pending |
+| OBS-07 | Phase 4 | Pending |
+| EVAL-01 | Phase 5 | Pending |
+| EVAL-02 | Phase 5 | Pending |
+| EVAL-03 | Phase 5 | Pending |
+| EVAL-04 | Phase 5 | Pending |
+| EVAL-05 | Phase 5 | Pending |
+| EVAL-06 | Phase 5 | Pending |
+| DOC-01 | Phase 6 | Pending |
+| DOC-02 | Phase 6 | Pending |
+| DOC-03 | Phase 6 | Pending |
+| DOC-04 | Phase 6 | Pending |
+| DOC-05 | Phase 6 | Pending |
+| DOC-06 | Phase 6 | Pending |
+| DOC-07 | Phase 6 | Pending |
+| DOC-08 | Phase 6 | Pending |
+
+**Coverage:**
+- v1 requirements: 39 total
+- Mapped to phases: 39
+- Unmapped: 0
+
+---
+*Requirements defined: 2026-08-18*
+*Last updated: 2026-08-18 after initialization*

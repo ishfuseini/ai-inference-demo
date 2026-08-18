@@ -23,9 +23,17 @@ class OpenRouterAuthError(OpenRouterError):
 
 
 class OpenRouterHTTPError(OpenRouterError):
-    def __init__(self, message: str, *, status_code: int, partial_text: str = "") -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int,
+        partial_text: str = "",
+        error_payload: dict | None = None,
+    ) -> None:
         super().__init__(message, partial_text=partial_text)
         self.status_code = status_code
+        self.error_payload = error_payload
 
 
 class OpenRouterTimeoutError(OpenRouterError):
@@ -100,7 +108,8 @@ async def stream_chat_completion(
     if strategy is None and model is None:
         raise ValueError("Either strategy or model must be provided.")
     resolved_model = model or (strategy.model if strategy is not None else None)
-    assert resolved_model is not None
+    if resolved_model is None:
+        raise ValueError("Neither model nor strategy.model was resolved.")
 
     if strategy is not None:
         body: dict[str, object] = {**strategy_payload(strategy), "messages": [{"role": "user", "content": prompt}], "stream": True}
@@ -125,11 +134,14 @@ async def stream_chat_completion(
 
     owns_client = http_client is None
     client = http_client if http_client is not None else httpx.AsyncClient(timeout=request_timeout)
+    # Only impose our timeout when we constructed the client; a caller-supplied
+    # http_client already owns its own timeout configuration.
+    stream_kwargs: dict[str, object] = {"timeout": request_timeout} if owns_client else {}
 
     try:
         try:
             async with client.stream(
-                "POST", OPENROUTER_CHAT_COMPLETIONS_URL, json=body, headers=headers, timeout=request_timeout
+                "POST", OPENROUTER_CHAT_COMPLETIONS_URL, json=body, headers=headers, **stream_kwargs
             ) as response:
                 if response.status_code == 401:
                     partial = "".join(text_parts)
@@ -157,12 +169,14 @@ async def stream_chat_completion(
 
                     if isinstance(payload, dict) and "error" in payload:
                         err = payload["error"]
-                        msg = err.get("message") if isinstance(err, dict) else str(err)
+                        err_obj = err if isinstance(err, dict) else {"message": str(err) if err is not None else None}
+                        msg = err_obj.get("message")
                         partial = "".join(text_parts)
                         raise OpenRouterHTTPError(
                             str(msg) if msg else "OpenRouter error",
                             status_code=response.status_code,
                             partial_text=partial,
+                            error_payload=err_obj,
                         )
 
                     if not isinstance(payload, dict):
@@ -197,8 +211,10 @@ async def stream_chat_completion(
             raise OpenRouterTimeoutError(f"OpenRouter request timed out: {exc}", partial_text=partial) from exc
         except httpx.HTTPError as exc:
             partial = "".join(text_parts)
-            # already handled status codes above; treat as generic HTTP error
-            raise OpenRouterHTTPError(str(exc), status_code=0, partial_text=partial) from exc
+            # already handled status codes above; treat as generic HTTP error, but
+            # surface a status code when one is attached to the underlying response.
+            status_code = exc.response.status_code if exc.response is not None else 0
+            raise OpenRouterHTTPError(str(exc), status_code=status_code, partial_text=partial) from exc
 
         latency_ms = int((time.monotonic() - start) * 1000)
         full_text = "".join(text_parts)

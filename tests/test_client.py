@@ -67,6 +67,67 @@ def test_stream_concatenates_deltas_and_returns_result() -> None:
     assert result.cost_usd == 0.001
 
 
+def test_stream_requires_strategy_or_model() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        pytest.fail("handler should not be invoked when validation fails")
+
+    with pytest.raises(ValueError, match="Either strategy or model must be provided."):
+        asyncio.run(
+            stream_chat_completion(
+                "hi", strategy=None, model=None, api_key="k", http_client=_client_with(handler)
+            ).__anext__()
+        )
+
+
+def test_stream_plain_model_without_strategy() -> None:
+    chunks = [
+        {"choices": [{"delta": {"content": "hi"}}], "model": "openai/gpt-4o-mini"},
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content)["model"] == "openai/gpt-4o-mini"
+        return httpx.Response(200, content=_sse_bytes(chunks))
+
+    async def _run() -> StreamedResult | None:
+        result: StreamedResult | None = None
+        async for item in stream_chat_completion(
+            "hi", model="openai/gpt-4o-mini", api_key="k", http_client=_client_with(handler)
+        ):
+            if isinstance(item, StreamedResult):
+                result = item
+        return result
+
+    result = asyncio.run(_run())
+    assert result is not None
+    assert result.model == "openai/gpt-4o-mini"
+
+
+def test_stream_provider_falls_back_to_openrouter_metadata() -> None:
+    chunks = [
+        {
+            "choices": [{"delta": {"content": "hi"}}],
+            "model": "openai/gpt-4o-mini",
+            "openrouter_metadata": {"provider": "some-provider"},
+        },
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=_sse_bytes(chunks))
+
+    async def _run() -> StreamedResult | None:
+        result: StreamedResult | None = None
+        async for item in stream_chat_completion(
+            "hi", strategy=DEFAULT_STRATEGY, api_key="k", http_client=_client_with(handler)
+        ):
+            if isinstance(item, StreamedResult):
+                result = item
+        return result
+
+    result = asyncio.run(_run())
+    assert result is not None
+    assert result.provider == "some-provider"
+
+
 def test_stream_missing_usage_is_unavailable() -> None:
     chunks = [
         {"choices": [{"delta": {"content": "hi"}}], "model": "openai/gpt-4o-mini"},

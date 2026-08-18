@@ -7,7 +7,7 @@
 ## Phases
 
 - [x] **Phase 1: Runnable Skeleton and Config** - Reviewer can install, configure, and launch the local app shell.
-- [ ] **Phase 2: Streaming Inference Evidence** - User can run a live streaming OpenRouter request with basic telemetry.
+- [~] **Phase 2: Streaming Inference Evidence** - User can run a live streaming OpenRouter request with basic telemetry. (PR-1 backend merged; PR-2 UI integration pending)
 - [ ] **Phase 3: Routing and Fallback Demo** - User can compare routing strategies and inspect reproducible fallback behavior.
 - [ ] **Phase 4: Telemetry, Repeat, and Observability** - User can compare runs with honest metadata, repeat/cache observations, and optional Langfuse traces.
 - [ ] **Phase 5: Deterministic Evals** - User can run small evals and compare model/strategy quality with telemetry evidence.
@@ -58,7 +58,16 @@ Plans:
   3. Completed run shows strategy, model/provider when available, latency, and success/failure state.
   4. Token and cost fields display values only when available and otherwise show unavailable.
 
-**Plans**: TBD
+**Plans**: 2 PRs (see `docs/tasks/phase-2-streaming-inference.md`)
+Plans:
+**PR-1** (merged)
+
+- [x] Streaming backend: client, models, routing, history, backend tests
+
+**PR-2** (pending)
+
+- [ ] UI integration: wire Run Inference button, streaming panel, telemetry panel, run history row, UI smoke test
+
 **UI hint**: yes
 
 ### Phase 3: Routing and Fallback Demo
@@ -135,8 +144,8 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Runnable Skeleton and Config | 0/0 | Not started | - |
-| 2. Streaming Inference Evidence | 0/0 | Not started | - |
+| 1. Runnable Skeleton and Config | 3/3 | Complete | 2026-08-18 |
+| 2. Streaming Inference Evidence | 1/2 | PR-1 merged, PR-2 pending | - |
 | 3. Routing and Fallback Demo | 0/0 | Not started | - |
 | 4. Telemetry, Repeat, and Observability | 0/0 | Not started | - |
 | 5. Deterministic Evals | 0/0 | Not started | - |

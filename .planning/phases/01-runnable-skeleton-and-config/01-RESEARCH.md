@@ -355,15 +355,15 @@ name = "openrouter-production-inference-lab"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-  "nicegui==3.16.0",
-  "httpx==0.28.1",
-  "langfuse==4.14.4",
+  "nicegui>=3.16.0",
+  "httpx>=0.28.1",
+  "langfuse>=4.14.4",
 ]
 
 [dependency-groups]
 dev = [
-  "pytest==9.1.1",
-  "ruff==0.16.3",
+  "pytest>=9.1.1",
+  "ruff>=0.16.3",
 ]
 
 [tool.ruff]
@@ -438,17 +438,17 @@ def build_app(config: AppConfig) -> None:
 | A2 | Warning signs such as hard-coded telemetry values and fake trace IDs are sufficient review heuristics for Phase 1. | Common Pitfalls | Medium: planner may need more explicit UI assertions if implementation gets larger. |
 | A3 | Launch smoke check can be non-live and bounded by starting then stopping the NiceGUI process. | Validation Architecture | Medium: NiceGUI process handling may need a subprocess timeout or manual check. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the planner pin exact package versions or allow compatible ranges?**
    - What we know: Current PyPI latests are listed above, but every package was flagged `SUS` by the legitimacy seam. [VERIFIED: PyPI JSON, 2026-08-18] [VERIFIED: package-legitimacy seam, 2026-08-18]
-   - What's unclear: Whether the user prefers exact pins in `pyproject.toml` or lockfile-only pinning.
-   - Recommendation: Use conservative compatible lower bounds in `pyproject.toml` after human verification, then rely on `uv.lock` for exact resolution. [ASSUMED]
+   - RESOLVED: Use conservative compatible lower bounds in `pyproject.toml` after the human package legitimacy checkpoint, then rely on `uv.lock` for exact resolution.
+   - Planner impact: Plan 01-02 must write lower-bound dependency specifiers for `nicegui`, `httpx`, `langfuse`, `pytest`, and `ruff`; the generated `uv.lock` provides the exact installed versions.
 
 2. **Should Phase 1 include `evals/cases.json` as an empty file or a small placeholder?**
    - What we know: D-01 says create `evals/`, and deferred ideas place deterministic eval command/output in Phase 5. [VERIFIED: .planning/phases/01-runnable-skeleton-and-config/01-CONTEXT.md:17-18] [VERIFIED: .planning/phases/01-runnable-skeleton-and-config/01-CONTEXT.md:105-109]
-   - What's unclear: Whether a placeholder JSON file helps or creates a false signal.
-   - Recommendation: Create `evals/.gitkeep` or a README note, not fake eval cases, unless the planner explicitly marks cases as seed-only and unused. [ASSUMED]
+   - RESOLVED: Create an honest `evals/` placeholder such as `evals/.gitkeep` or `evals/README.md`; do not create fake `evals/cases.json` or fake eval cases in Phase 1.
+   - Planner impact: Plan 01-03 uses `evals/.gitkeep` so the directory exists without implying eval cases or eval execution are available.
 
 ## Environment Availability
 

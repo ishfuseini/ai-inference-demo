@@ -22,7 +22,7 @@
 | `src/openrouter_demo/telemetry.py` | service / utility | transform / event-driven | `docs/specs/data-model.md` + `docs/ux/screen-spec.md` | seed-doc |
 | `src/openrouter_demo/evals.py` | service / utility | batch / file-I/O | `docs/specs/contracts/local-demo-contract.md` + `data/api-complaint-rubric.md` | seed-doc |
 | `src/openrouter_demo/models.py` | model | transform | `docs/specs/data-model.md` | seed-doc |
-| `evals/cases.json` | data / config | file-I/O | `docs/specs/data-model.md` + `data/api-complaint.csv` | seed-doc |
+| `evals/.gitkeep` | data / config | file-I/O | `docs/specs/data-model.md` + `data/api-complaint.csv` | seed-doc |
 | `tests/test_config.py` | test | request-response / transform | `.planning/phases/01-runnable-skeleton-and-config/01-RESEARCH.md` | seed-doc |
 | `tests/test_imports.py` | test | batch / importability | `.planning/phases/01-runnable-skeleton-and-config/01-CONTEXT.md` | seed-doc |
 
@@ -73,15 +73,15 @@ name = "openrouter-production-inference-lab"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-  "nicegui==3.16.0",
-  "httpx==0.28.1",
-  "langfuse==4.14.4",
+  "nicegui>=3.16.0",
+  "httpx>=0.28.1",
+  "langfuse>=4.14.4",
 ]
 
 [dependency-groups]
 dev = [
-  "pytest==9.1.1",
-  "ruff==0.16.3",
+  "pytest>=9.1.1",
+  "ruff>=0.16.3",
 ]
 
 [tool.ruff]
@@ -411,9 +411,9 @@ Plus **auto-fail conditions**, which zero the case regardless of the other score
 
 ---
 
-### `evals/cases.json` (data / config, file-I/O)
+### `evals/.gitkeep` (data / config, file-I/O)
 
-**Analog:** No existing `evals/cases.json`. The repo has seed CSV/rubric material, but Phase 1 should not wire eval execution.
+**Analog:** No existing `evals/` directory. The repo has seed CSV/rubric material, but Phase 1 should not wire eval execution or create fake cases.
 
 **Future eval case pattern** (`docs/specs/data-model.md` lines 103-120):
 ```text
@@ -425,7 +425,7 @@ Plus **auto-fail conditions**, which zero the case regardless of the other score
 - `scoring_notes`: Reviewer-facing scoring explanation.
 ```
 
-**Caution:** Research open question recommends `evals/.gitkeep` or a README note instead of fake eval cases unless cases are clearly marked seed-only and unused (`01-RESEARCH.md` lines 441-445 and following). Planner should decide whether `evals/cases.json` is required in Phase 1 or whether `evals/` placeholder is more honest.
+**Resolved Phase 1 placeholder:** Use `evals/.gitkeep` or `evals/README.md` instead of `evals/cases.json`; do not create fake eval cases until the eval phase owns executable cases.
 
 ---
 
@@ -574,7 +574,7 @@ No implemented code analogs exist in the repository. The current repo contains s
 | `src/openrouter_demo/telemetry.py` | service / utility | transform / event-driven | No telemetry module exists. Use data model for future fields. |
 | `src/openrouter_demo/evals.py` | service / utility | batch / file-I/O | No eval runner exists. Create honest importable stub only. |
 | `src/openrouter_demo/models.py` | model | transform | No model module exists. Use data model docs. |
-| `evals/cases.json` | data / config | file-I/O | No eval directory exists. Planner should avoid fake cases unless explicitly seed-only. |
+| `evals/.gitkeep` | data / config | file-I/O | No eval directory exists. Use an honest directory marker and avoid fake cases. |
 | `tests/test_config.py` | test | request-response / transform | No tests exist. Use research pytest example. |
 | `tests/test_imports.py` | test | batch / importability | No tests exist. Use importable scaffold requirement. |
 

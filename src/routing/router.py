@@ -6,7 +6,7 @@ point for Phase 3 implementation.
 
 from typing import List, Dict, Any, Optional
 
-from openrouter_demo.telemetry import emit_routing_event, emit_fallback_event
+from routing.telemetry import emit_routing_event, emit_fallback_event
 
 
 class RoutingStrategy:

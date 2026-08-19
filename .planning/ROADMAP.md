@@ -84,7 +84,16 @@ Plans:
   4. Fallback scenario shows primary attempt, failure or timeout reason, fallback route, and final result.
   5. A successful fallback never hides the failed primary attempt.
 
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — Strategy selection vertical slice: routing strategies, model types, UI selector, strategy payloads
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-02-PLAN.md — Fallback scenario vertical slice: two-attempt orchestration, UI toggle, fallback evidence rendering
+
 **UI hint**: yes
 
 ### Phase 4: Telemetry, Repeat, and Observability
@@ -146,7 +155,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Runnable Skeleton and Config | 3/3 | Complete    | 2026-08-18 |
 | 2. Streaming Inference Evidence | 2/2 | Complete    | 2026-08-19 |
-| 3. Routing and Fallback Demo | 0/0 | Not started | - |
+| 3. Routing and Fallback Demo | 0/2 | Planning complete | - |
 | 4. Telemetry, Repeat, and Observability | 0/0 | Not started | - |
 | 5. Deterministic Evals | 0/0 | Not started | - |
 | 6. Interview Walkthrough and Quality Gates | 0/0 | Not started | - |

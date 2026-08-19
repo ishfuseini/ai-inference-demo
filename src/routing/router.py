@@ -6,7 +6,7 @@ point for Phase 3 implementation.
 
 from typing import List, Dict, Any, Optional
 
-from routing.telemetry import emit_routing_event, emit_fallback_event
+from routing.telemetry import emit_routing_event, emit_fallback_event, get_average_latency
 
 
 class RoutingStrategy:
@@ -34,8 +34,15 @@ class Router:
             self._rr_index += 1
             return provider
         if strategy == RoutingStrategy.LATENCY:
-            # Placeholder: real implementation would consult telemetry
-            return min(self.providers)
+            # Consult telemetry average latencies; pick the provider with the lowest average
+            latencies = {p: get_average_latency(p) for p in self.providers}
+            # filter out providers without latency data (None), prefer known latencies
+            known = {p: l for p, l in latencies.items() if l is not None}
+            if known:
+                # pick provider with lowest average latency
+                return min(known, key=lambda p: known[p])
+            # fallback to priority if no telemetry available
+            return self.providers[0]
         # Fallback default
         return self.providers[0]
 

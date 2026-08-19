@@ -7,7 +7,7 @@
 ## Phases
 
 - [x] **Phase 1: Runnable Skeleton and Config** - Reviewer can install, configure, and launch the local app shell.
-- [~] **Phase 2: Streaming Inference Evidence** - User can run a live streaming OpenRouter request with basic telemetry. (PR-1 backend merged; PR-2 UI integration pending)
+- [x] **Phase 2: Streaming Inference Evidence** - User can run a live streaming OpenRouter request with basic telemetry.
 - [ ] **Phase 3: Routing and Fallback Demo** - User can compare routing strategies and inspect reproducible fallback behavior.
 - [ ] **Phase 4: Telemetry, Repeat, and Observability** - User can compare runs with honest metadata, repeat/cache observations, and optional Langfuse traces.
 - [ ] **Phase 5: Deterministic Evals** - User can run small evals and compare model/strategy quality with telemetry evidence.
@@ -64,9 +64,9 @@ Plans:
 
 - [x] Streaming backend: client, models, routing, history, backend tests
 
-**PR-2** (pending)
+**PR-2** (merged)
 
-- [ ] UI integration: wire Run Inference button, streaming panel, telemetry panel, run history row, UI smoke test
+- [x] UI integration: wire Run Inference button, streaming panel, telemetry panel, run history row, UI smoke test
 
 **UI hint**: yes
 

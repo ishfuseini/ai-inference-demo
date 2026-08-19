@@ -27,11 +27,11 @@ See: `.planning/PROJECT.md` (updated 2026-08-19)
 
 **Phase:** 3 — Routing and Fallback Demo
 **Plan:** Drafted (.planning/phases/03-routing-and-fallback-demo/PLAN.md)
-**Status:** Planning
-**Progress:** 10%
+**Status:** In progress
+**Progress:** 25%
 
 ```text
-Progress: [#---------] 10%
+Progress: [##--------] 25%
 ```
 
 ## Performance Metrics

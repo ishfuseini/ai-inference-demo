@@ -14,12 +14,11 @@ Make production inference behavior visible and defensible in a five-minute inter
 
 ### Validated
 
-(None yet - ship to validate)
+- [x] Reviewer can install and run the local demo with `uv`. Validated in Phase 01: Runnable Skeleton and Config.
+- [x] Candidate can run a real streaming OpenRouter request from a NiceGUI interface. Validated in Phase 02: Streaming Inference Evidence.
 
 ### Active
 
-- [ ] Reviewer can install and run the local demo with `uv`.
-- [ ] Candidate can run a real streaming OpenRouter request from a NiceGUI interface.
 - [ ] Candidate can compare routing strategies using visible model, provider, latency, token, cost, fallback, and trace evidence.
 - [ ] Candidate can trigger a reproducible fallback path that preserves the failed primary attempt and the recovery attempt.
 - [ ] Candidate can report cache/repeat behavior honestly, without claiming cache hits unless metadata supports it.
@@ -85,4 +84,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state.
 
 ---
-*Last updated: 2026-08-18 after initialization*
+*Last updated: 2026-08-19 after Phase 01 verification*

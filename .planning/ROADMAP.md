@@ -144,8 +144,8 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Runnable Skeleton and Config | 3/3 | Complete | 2026-08-18 |
-| 2. Streaming Inference Evidence | 1/2 | PR-1 merged, PR-2 pending | - |
+| 1. Runnable Skeleton and Config | 3/3 | Complete    | 2026-08-18 |
+| 2. Streaming Inference Evidence | 2/2 | Complete    | 2026-08-19 |
 | 3. Routing and Fallback Demo | 0/0 | Not started | - |
 | 4. Telemetry, Repeat, and Observability | 0/0 | Not started | - |
 | 5. Deterministic Evals | 0/0 | Not started | - |

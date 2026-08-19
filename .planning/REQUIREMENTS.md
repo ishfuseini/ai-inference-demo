@@ -16,12 +16,12 @@
 
 ### Streaming Inference
 
-- [~] **INF-01**: User can enter or use a prompt and run a live OpenRouter chat completion.
-- [~] **INF-02**: User can see response text appear progressively while the model streams.
-- [~] **INF-03**: Completed run displays selected strategy and actual model/provider evidence when available.
-- [~] **INF-04**: Completed run displays observed latency and success/failure state.
-- [~] **INF-05**: Completed run displays token and cost metadata when available.
-- [~] **INF-06**: UI clearly distinguishes unavailable metadata from zero values.
+- [x] **INF-01**: User can enter or use a prompt and run a live OpenRouter chat completion.
+- [x] **INF-02**: User can see response text appear progressively while the model streams.
+- [x] **INF-03**: Completed run displays selected strategy and actual model/provider evidence when available.
+- [x] **INF-04**: Completed run displays observed latency and success/failure state.
+- [x] **INF-05**: Completed run displays token and cost metadata when available.
+- [x] **INF-06**: UI clearly distinguishes unavailable metadata from zero values.
 
 ### Routing and Fallback
 
@@ -95,12 +95,12 @@
 | SETUP-04 | Phase 1 | Complete |
 | SETUP-05 | Phase 1 | Complete |
 | SETUP-06 | Phase 1 | Complete |
-| INF-01 | Phase 2 | In Progress (PR-1 merged, PR-2 pending) |
-| INF-02 | Phase 2 | In Progress (PR-1 merged, PR-2 pending) |
-| INF-03 | Phase 2 | In Progress (PR-1 merged, PR-2 pending) |
-| INF-04 | Phase 2 | In Progress (PR-1 merged, PR-2 pending) |
-| INF-05 | Phase 2 | In Progress (PR-1 merged, PR-2 pending) |
-| INF-06 | Phase 2 | In Progress (PR-1 merged, PR-2 pending) |
+| INF-01 | Phase 2 | Complete |
+| INF-02 | Phase 2 | Complete |
+| INF-03 | Phase 2 | Complete |
+| INF-04 | Phase 2 | Complete |
+| INF-05 | Phase 2 | Complete |
+| INF-06 | Phase 2 | Complete |
 | ROUTE-01 | Phase 3 | Pending |
 | ROUTE-02 | Phase 3 | Pending |
 | ROUTE-03 | Phase 3 | Pending |
@@ -136,4 +136,4 @@
 
 ---
 *Requirements defined: 2026-08-18*
-*Last updated: 2026-08-18 after Phase 2 PR-1 merge*
+*Last updated: 2026-08-19 after Phase 2 execution*

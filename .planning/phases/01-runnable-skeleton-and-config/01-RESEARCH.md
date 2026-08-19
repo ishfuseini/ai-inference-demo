@@ -285,9 +285,7 @@ class PhaseNotImplementedError(RuntimeError):
 
 
 def stream_chat_completion(*_: object, **__: object) -> None:
-    raise PhaseNotImplementedError(
-        "Live OpenRouter streaming is planned for Phase 2."
-    )
+    raise PhaseNotImplementedError("Live OpenRouter streaming is planned for Phase 2.")
 ```
 
 ### Anti-Patterns to Avoid

@@ -2,31 +2,32 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 1
-status: phase_complete
-stopped_at: Phase 1 complete
-last_updated: "2026-08-18T16:30:00.000Z"
+current_phase: 3
+current_phase_name: Routing and Fallback Demo
+status: planning
+stopped_at: Phase 2 complete
+last_updated: "2026-08-19T17:06:39.610Z"
 progress:
   total_phases: 6
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  completed_phases: 2
+  total_plans: 5
+  completed_plans: 5
 ---
 
 # Project State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-08-18)
+See: `.planning/PROJECT.md` (updated 2026-08-19)
 
 **Core value:** Make production inference behavior visible and defensible in a five-minute interview demo.
-**Current focus:** Phase 1: Runnable Skeleton and Config
+**Current focus:** Phase 3: Routing and Fallback Demo
 
 ## Current Position
 
-**Phase:** 1
-**Plan:** 01-01, 01-02, and 01-03 complete
-**Status:** Phase 1 complete
+**Phase:** 3 — Routing and Fallback Demo
+**Plan:** Not started
+**Status:** Ready to plan
 **Progress:** 100%
 
 ```text
@@ -37,10 +38,10 @@ Progress: [##########] 100%
 
 | Metric | Current |
 |--------|---------|
-| Phases complete | 1/6 |
+| Phases complete | 2/6 |
 | Requirements mapped | 39/39 |
-| Requirements complete | 6/39 |
-| Plans complete | 3 |
+| Requirements complete | 12/39 |
+| Plans complete | 5 |
 
 ## Accumulated Context
 
@@ -54,7 +55,7 @@ Progress: [##########] 100%
 
 ### Todos
 
-- Run `$gsd-transition` or plan Phase 2 when ready.
+- Plan Phase 3 routing and fallback demo.
 
 ### Blockers
 
@@ -62,11 +63,11 @@ Progress: [##########] 100%
 
 ## Session Continuity
 
-**Last session:** 2026-08-18T15:35:24.516Z
-**Stopped at:** Phase 1 complete
+**Last session:** 2026-08-19T17:06:39.610Z
+**Stopped at:** Phase 2 complete
 **Resume file:** .planning/ROADMAP.md
 
-Phase 1 created the runnable skeleton, config shell, setup docs, package boundaries, and non-live guards. Phase 2 can start streaming inference work.
+Phase 2 added the default-route streaming inference console: prompt/sample prompt controls, guarded OpenRouter run button, progressive response panel, telemetry rows, and run history. Phase 3 can add strategy selection and fallback behavior.
 
 ---
-*Last updated: 2026-08-18 after Phase 1 execution*
+*Last updated: 2026-08-19 after Phase 2 execution*

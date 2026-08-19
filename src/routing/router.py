@@ -1,0 +1,65 @@
+"""Routing layer for selecting provider/model and handling fallbacks.
+
+This is a minimal stub to be expanded during implementation.
+"""
+
+from typing import List, Dict, Any, Optional
+
+
+class RoutingStrategy:
+    PRIORITY = "priority"
+    ROUND_ROBIN = "round_robin"
+    LATENCY = "latency"
+
+
+class Router:
+    def __init__(self, providers: List[str]):
+        if not providers:
+            raise ValueError("Router requires a non-empty list of providers")
+        self.providers = providers
+        self._rr_index = 0
+
+    def select_provider(self, strategy: str) -> str:
+        """Select a provider based on the requested strategy.
+
+        Returns the provider key/name.
+        """
+        if strategy == RoutingStrategy.PRIORITY:
+            return self.providers[0]
+        if strategy == RoutingStrategy.ROUND_ROBIN:
+            provider = self.providers[self._rr_index % len(self.providers)]
+            self._rr_index += 1
+            return provider
+        if strategy == RoutingStrategy.LATENCY:
+            # Placeholder: real implementation would consult telemetry
+            return min(self.providers)
+        # Fallback default
+        return self.providers[0]
+
+    def call_with_fallback(self, strategy: str, call_fn, fallback_order: Optional[List[str]] = None, **kwargs) -> Dict[str, Any]:
+        """Attempt call using selected provider, then fall back to others on failure.
+
+        call_fn(provider, **kwargs) should raise an exception on failure.
+        Returns dict with keys: provider, result, attempted
+        """
+        attempted = []
+        primary = self.select_provider(strategy)
+        order = [primary]
+        if fallback_order:
+            # include fallback order but avoid duplicates
+            order += [p for p in fallback_order if p not in order]
+        # finally append remaining providers
+        order += [p for p in self.providers if p not in order]
+
+        last_exc = None
+        for provider in order:
+            attempted.append(provider)
+            try:
+                result = call_fn(provider, **kwargs)
+                return {"provider": provider, "result": result, "attempted": attempted}
+            except Exception as e:
+                last_exc = e
+                # continue to next provider
+                continue
+        # if all fail, raise last exception
+        raise last_exc

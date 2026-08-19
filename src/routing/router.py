@@ -1,9 +1,12 @@
 """Routing layer for selecting provider/model and handling fallbacks.
 
-This is a minimal stub to be expanded during implementation.
+This implements basic telemetry emits via the project's telemetry helpers as a starting
+point for Phase 3 implementation.
 """
 
 from typing import List, Dict, Any, Optional
+
+from routing.telemetry import emit_routing_event, emit_fallback_event, get_average_latency
 
 
 class RoutingStrategy:
@@ -31,8 +34,15 @@ class Router:
             self._rr_index += 1
             return provider
         if strategy == RoutingStrategy.LATENCY:
-            # Placeholder: real implementation would consult telemetry
-            return min(self.providers)
+            # Consult telemetry average latencies; pick the provider with the lowest average
+            latencies = {p: get_average_latency(p) for p in self.providers}
+            # filter out providers without latency data (None), prefer known latencies
+            known = {p: l for p, l in latencies.items() if l is not None}
+            if known:
+                # pick provider with lowest average latency
+                return min(known, key=lambda p: known[p])
+            # fallback to priority if no telemetry available
+            return self.providers[0]
         # Fallback default
         return self.providers[0]
 
@@ -56,10 +66,20 @@ class Router:
             attempted.append(provider)
             try:
                 result = call_fn(provider, **kwargs)
+                # emit routing event (non-blocking)
+                try:
+                    emit_routing_event(provider=provider, strategy=strategy, metadata={"attempted": attempted})
+                except Exception:
+                    # telemetry must not break the call path
+                    pass
                 return {"provider": provider, "result": result, "attempted": attempted}
             except Exception as e:
                 last_exc = e
                 # continue to next provider
                 continue
-        # if all fail, raise last exception
+        # if all fail, emit fallback event (non-blocking) and raise last exception
+        try:
+            emit_fallback_event(attempted=attempted, final_provider=attempted[-1] if attempted else "")
+        except Exception:
+            pass
         raise last_exc

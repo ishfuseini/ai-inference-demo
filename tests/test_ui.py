@@ -1,11 +1,30 @@
 import asyncio
+import inspect
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 
 from openrouter_demo.client import OpenRouterHTTPError
 from openrouter_demo.history import RunHistory
-from openrouter_demo.models import UNAVAILABLE, Status, StreamChunk, StreamedResult
+from openrouter_demo.models import (
+    UNAVAILABLE,
+    InferenceRun,
+    Status,
+    StreamChunk,
+    StreamedResult,
+    TelemetryEvidence,
+)
 from openrouter_demo.routing import DEFAULT_STRATEGY
-from openrouter_demo.ui import _format_cost, _format_metadata, _run_inference
+from openrouter_demo.ui import (
+    FAILURE_RESPONSE,
+    STREAMING_RESPONSE,
+    SUCCESS_RESPONSE,
+    _format_cost,
+    _format_metadata,
+    _history_rows,
+    _run_inference,
+    _telemetry_rows,
+    build_app,
+)
 
 
 def _run(coro):
@@ -89,3 +108,54 @@ def test_run_inference_rejects_blank_prompt() -> None:
         assert str(exc) == "Prompt must not be blank."
     else:
         raise AssertionError("blank prompt was accepted")
+
+
+def test_telemetry_and_history_rows_render_unavailable_copy() -> None:
+    run = InferenceRun(
+        run_id="run-1",
+        prompt="Prompt",
+        strategy_name=DEFAULT_STRATEGY.name,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        status=Status.SUCCEEDED,
+        streamed_text="done",
+        error_message=None,
+        telemetry=TelemetryEvidence(
+            model=UNAVAILABLE,
+            provider=UNAVAILABLE,
+            latency_ms=15,
+            prompt_tokens=UNAVAILABLE,
+            completion_tokens=UNAVAILABLE,
+            total_tokens=UNAVAILABLE,
+            cost_usd=UNAVAILABLE,
+        ),
+    )
+    history = RunHistory()
+    history.append(run)
+
+    telemetry = dict(_telemetry_rows(run))
+    assert telemetry["Model"] == "Unavailable from selected route/provider."
+    assert telemetry["Provider"] == "Unavailable from selected route/provider."
+    assert telemetry["Tokens"] == "Unavailable from selected route/provider."
+    assert telemetry["Cost"] == "Cost metadata was not returned for this route/provider."
+    assert _history_rows(history)[0][2:] == (
+        "Unavailable from selected route/provider.",
+        "Unavailable from selected route/provider.",
+        "15 ms",
+        "Unavailable from selected route/provider.",
+        "Cost metadata was not returned for this route/provider.",
+    )
+
+
+def test_build_app_preserves_missing_key_guard_and_required_copy() -> None:
+    signature = inspect.signature(build_app)
+    assert "history" in signature.parameters
+    assert signature.parameters["config"].annotation == "AppConfig"
+
+    source = inspect.getsource(build_app)
+    assert "Set {OPENROUTER_API_KEY} in your shell, then restart the app." in source
+    assert "Ask a production-style question, classification task, or summarization task..." in source
+    assert STREAMING_RESPONSE == "Streaming from OpenRouter..."
+    assert SUCCESS_RESPONSE == "Request completed successfully."
+    assert FAILURE_RESPONSE == "Request failed before fallback could complete."
+    assert "run_button.props(\"disable\")" in source

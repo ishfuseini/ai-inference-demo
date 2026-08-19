@@ -6,7 +6,11 @@ point for Phase 3 implementation.
 
 from typing import List, Dict, Any, Optional
 
+import logging
+
 from routing.telemetry import emit_routing_event, emit_fallback_event, get_average_latency
+
+logger = logging.getLogger(__name__)
 
 
 class RoutingStrategy:
@@ -70,8 +74,8 @@ class Router:
                 try:
                     emit_routing_event(provider=provider, strategy=strategy, metadata={"attempted": attempted})
                 except Exception:
-                    # telemetry must not break the call path
-                    pass
+                    # telemetry must not break the call path, but log failures at debug level
+                    logger.debug("Failed to emit routing event", exc_info=True, extra={"provider": provider, "strategy": strategy, "attempted": attempted})
                 return {"provider": provider, "result": result, "attempted": attempted}
             except Exception as e:
                 last_exc = e

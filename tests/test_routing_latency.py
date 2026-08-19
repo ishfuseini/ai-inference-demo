@@ -12,3 +12,17 @@ def test_latency_strategy_prefers_low_latency():
 
     selected = r.select_provider(RoutingStrategy.LATENCY)
     assert selected == "fast"
+
+
+def test_latency_strategy_partial_and_missing_data():
+    # case: only one provider has latency data
+    r = Router(["a", "b", "c"])
+    record_latency("b", 100.0)
+
+    selected = r.select_provider(RoutingStrategy.LATENCY)
+    assert selected == "b"
+
+    # case: no latency data -> fallback to priority (index 0)
+    r2 = Router(["x", "y"])
+    selected2 = r2.select_provider(RoutingStrategy.LATENCY)
+    assert selected2 == "x"

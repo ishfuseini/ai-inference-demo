@@ -25,9 +25,9 @@ See: `.planning/PROJECT.md` (updated 2026-08-19)
 
 ## Current Position
 
-**Phase:** 3 — Routing and Fallback Demo
-**Plan:** Drafted (.planning/phases/03-routing-and-fallback-demo/PLAN.md)
-**Status:** Complete
+**Phase:** 4 — Telemetry, Repeat, and Observability
+**Plan:** Drafted (.planning/phases/04-telemetry-repeat-observability/PLAN.md)
+**Status:** Ready to plan
 **Progress:** 100%
 
 ```text

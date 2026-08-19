@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from nicegui import ui
+from nicegui import ui, app as ng_app
 
 from openrouter_demo.config import load_config
 from openrouter_demo.history import RunHistory
@@ -17,6 +17,16 @@ def main() -> None:
 
     history = SQLiteRunHistory(db_path="data/runs.db")
     build_app(config, history)
+
+    # Health endpoint for platform readiness checks
+    @ng_app.get("/health")
+    def health():
+        return {
+            "status": "ok" if config.openrouter_ready else "degraded",
+            "openrouter_ready": config.openrouter_ready,
+            "langfuse_ready": config.langfuse_ready,
+        }
+
     ui.run(title="OpenRouter Production Inference Lab", reload=False)
 
 

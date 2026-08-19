@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import uuid
 from collections.abc import AsyncIterator, Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -24,21 +25,32 @@ from openrouter_demo.routing import DEFAULT_STRATEGY, RoutingStrategy
 type StreamFn = Callable[..., AsyncIterator[StreamChunk | StreamedResult]]
 
 
+_UNAVAILABLE_COPY = "Unavailable from selected route/provider."
+_COST_UNAVAILABLE_COPY = "Cost metadata was not returned for this route/provider."
+_LATENCY_UNAVAILABLE_COPY = "Latency was not returned for this route/provider."
+
+
 def _format_metadata(value: str | Unavailable) -> str:
     if isinstance(value, Unavailable):
-        return "Unavailable from selected route/provider."
+        return _UNAVAILABLE_COPY
     return value
 
 
 def _format_tokens(value: int | Unavailable) -> str:
     if isinstance(value, Unavailable):
-        return "Unavailable from selected route/provider."
+        return _UNAVAILABLE_COPY
     return str(value)
+
+
+def _format_latency(value: int | Unavailable) -> str:
+    if isinstance(value, Unavailable):
+        return _LATENCY_UNAVAILABLE_COPY
+    return f"{value} ms"
 
 
 def _format_cost(value: float | Unavailable) -> str:
     if isinstance(value, Unavailable):
-        return "Cost metadata was not returned for this route/provider."
+        return _COST_UNAVAILABLE_COPY
     return f"${value:g}"
 
 SAMPLE_PROMPTS = (
@@ -55,24 +67,33 @@ FAILURE_RESPONSE = "Request failed before fallback could complete."
 TRACE_DISABLED = "Langfuse tracing disabled. Configure Langfuse credentials to enable trace links."
 
 
+@dataclass
+class _UIState:
+    is_running: bool = False
+    last_run: InferenceRun | None = None
+    response: str = ""
+    response_status: str = EMPTY_RESPONSE
+
+
 def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> list[tuple[str, str]]:
+    strategy = (run.strategy_name or DEFAULT_STRATEGY.name) if run is not None else DEFAULT_STRATEGY.name
     if is_running:
         return [
             ("Status", STREAMING_RESPONSE),
-            ("Strategy", "Default"),
+            ("Strategy", strategy),
             ("Model", _format_metadata(Unavailable())),
             ("Provider", _format_metadata(Unavailable())),
-            ("Latency", _format_tokens(Unavailable())),
+            ("Latency", _format_latency(Unavailable())),
             ("Tokens", _format_tokens(Unavailable())),
             ("Cost", _format_cost(Unavailable())),
         ]
     if run is None:
         return [
             ("Status", "Waiting for request."),
-            ("Strategy", "Default"),
+            ("Strategy", strategy),
             ("Model", _format_metadata(Unavailable())),
             ("Provider", _format_metadata(Unavailable())),
-            ("Latency", _format_tokens(Unavailable())),
+            ("Latency", _format_latency(Unavailable())),
             ("Tokens", _format_tokens(Unavailable())),
             ("Cost", _format_cost(Unavailable())),
         ]
@@ -81,12 +102,12 @@ def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> li
     status = SUCCESS_RESPONSE if run.status is Status.SUCCEEDED else FAILURE_RESPONSE
     return [
         ("Status", status),
-        ("Strategy", "Default"),
+        ("Strategy", strategy),
         ("Model", _format_metadata(telemetry.model) if telemetry else _format_metadata(Unavailable())),
         ("Provider", _format_metadata(telemetry.provider) if telemetry else _format_metadata(Unavailable())),
         (
             "Latency",
-            f"{telemetry.latency_ms} ms" if telemetry else _format_tokens(Unavailable()),
+            _format_latency(telemetry.latency_ms) if telemetry else _format_latency(Unavailable()),
         ),
         (
             "Tokens",
@@ -106,7 +127,7 @@ def _history_rows(history: RunHistory) -> list[tuple[str, str, str, str, str, st
                 run.strategy_name,
                 _format_metadata(telemetry.model) if telemetry else _format_metadata(Unavailable()),
                 _format_metadata(telemetry.provider) if telemetry else _format_metadata(Unavailable()),
-                f"{telemetry.latency_ms} ms" if telemetry else _format_tokens(Unavailable()),
+                _format_latency(telemetry.latency_ms) if telemetry else _format_latency(Unavailable()),
                 _format_tokens(telemetry.total_tokens) if telemetry else _format_tokens(Unavailable()),
                 _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable()),
             )
@@ -229,17 +250,12 @@ def build_app(
     stream_fn: StreamFn = stream_chat_completion,
 ) -> None:
     ui.page_title("OpenRouter Production Inference Lab")
-    state: dict[str, InferenceRun | bool | str | None] = {
-        "is_running": False,
-        "last_run": None,
-        "response": "",
-        "response_status": EMPTY_RESPONSE,
-    }
+    state = _UIState()
 
     def sync_run_button() -> None:
         disabled = (
             not config.openrouter_ready
-            or bool(state["is_running"])
+            or state.is_running
             or not str(prompt.value or "").strip()
         )
         if disabled:
@@ -251,15 +267,12 @@ def build_app(
     def response_panel() -> None:
         with ui.card().classes("w-full"):
             ui.label("Streaming response").classes("font-semibold")
-            ui.label(str(state["response_status"])).classes("text-sm text-gray-600")
-            ui.label(str(state["response"] or EMPTY_RESPONSE)).classes("whitespace-pre-wrap")
+            ui.label(state.response_status).classes("text-sm text-gray-600")
+            ui.label(state.response or EMPTY_RESPONSE).classes("whitespace-pre-wrap")
 
     @ui.refreshable
     def telemetry_panel() -> None:
-        _render_telemetry(
-            state["last_run"] if isinstance(state["last_run"], InferenceRun) else None,
-            is_running=bool(state["is_running"]),
-        )
+        _render_telemetry(state.last_run, is_running=state.is_running)
 
     @ui.refreshable
     def history_panel() -> None:
@@ -269,16 +282,16 @@ def build_app(
         cast(Any, panel).refresh()
 
     async def run_request() -> None:
-        if not config.openrouter_ready or bool(state["is_running"]):
+        if not config.openrouter_ready or state.is_running:
             return
         prompt_text = str(prompt.value or "").strip()
         if not prompt_text:
             sync_run_button()
             return
 
-        state["is_running"] = True
-        state["response"] = ""
-        state["response_status"] = STREAMING_RESPONSE
+        state.is_running = True
+        state.response = ""
+        state.response_status = STREAMING_RESPONSE
         sync_run_button()
         refresh(response_panel)
         refresh(telemetry_panel)
@@ -288,7 +301,7 @@ def build_app(
         ) -> AsyncIterator[StreamChunk | StreamedResult]:
             async for event in stream_fn(prompt_value, **kwargs):
                 if isinstance(event, StreamChunk):
-                    state["response"] = str(state["response"]) + event.text_delta
+                    state.response = state.response + event.text_delta
                     refresh(response_panel)
                 yield event
 
@@ -299,10 +312,10 @@ def build_app(
             stream_fn=observed_stream,
             strategy=DEFAULT_STRATEGY,
         )
-        state["is_running"] = False
-        state["last_run"] = run
-        state["response"] = run.streamed_text
-        state["response_status"] = (
+        state.is_running = False
+        state.last_run = run
+        state.response = run.streamed_text
+        state.response_status = (
             SUCCESS_RESPONSE if run.status is Status.SUCCEEDED else FAILURE_RESPONSE
         )
         sync_run_button()

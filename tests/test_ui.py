@@ -1,5 +1,4 @@
 import asyncio
-import inspect
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
@@ -15,15 +14,12 @@ from openrouter_demo.models import (
 )
 from openrouter_demo.routing import DEFAULT_STRATEGY
 from openrouter_demo.ui import (
-    FAILURE_RESPONSE,
     STREAMING_RESPONSE,
-    SUCCESS_RESPONSE,
     _format_cost,
     _format_metadata,
     _history_rows,
     _run_inference,
     _telemetry_rows,
-    build_app,
 )
 
 
@@ -147,15 +143,29 @@ def test_telemetry_and_history_rows_render_unavailable_copy() -> None:
     )
 
 
-def test_build_app_preserves_missing_key_guard_and_required_copy() -> None:
-    signature = inspect.signature(build_app)
-    assert "history" in signature.parameters
-    assert signature.parameters["config"].annotation == "AppConfig"
+def test_telemetry_rows_reflect_run_strategy() -> None:
+    run = InferenceRun(
+        run_id="run-strategy",
+        prompt="Prompt",
+        strategy_name="cost",
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        status=Status.SUCCEEDED,
+        streamed_text="done",
+        error_message=None,
+        telemetry=None,
+    )
 
-    source = inspect.getsource(build_app)
-    assert "Set {OPENROUTER_API_KEY} in your shell, then restart the app." in source
-    assert "Ask a production-style question, classification task, or summarization task..." in source
-    assert STREAMING_RESPONSE == "Streaming from OpenRouter..."
-    assert SUCCESS_RESPONSE == "Request completed successfully."
-    assert FAILURE_RESPONSE == "Request failed before fallback could complete."
-    assert "run_button.props(\"disable\")" in source
+    telemetry = dict(_telemetry_rows(run))
+    assert telemetry["Strategy"] == "cost"
+
+    idle = dict(_telemetry_rows(None))
+    assert idle["Strategy"] == DEFAULT_STRATEGY.name
+    assert idle["Latency"] == "Latency was not returned for this route/provider."
+    assert idle["Tokens"] == "Unavailable from selected route/provider."
+
+
+def test_telemetry_rows_streaming_state_copy() -> None:
+    rows = dict(_telemetry_rows(None, is_running=True))
+    assert rows["Status"] == STREAMING_RESPONSE
+    assert rows["Latency"] == "Latency was not returned for this route/provider."

@@ -12,7 +12,10 @@ from openrouter_demo.ui import build_app
 
 def main() -> None:
     config = load_config()
-    history = RunHistory()
+    # Use SQLite-backed run history for demo deployments (persist recent runs)
+    from openrouter_demo.sqlite_store import SQLiteRunHistory
+
+    history = SQLiteRunHistory(db_path="data/runs.db")
     build_app(config, history)
     ui.run(title="OpenRouter Production Inference Lab", reload=False)
 

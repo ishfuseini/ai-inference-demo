@@ -132,6 +132,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Local SQLite DB for demo runs
+data/runs.db
+
 # Spyder project settings
 .spyderproject
 .spyproject

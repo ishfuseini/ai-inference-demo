@@ -706,22 +706,22 @@ def _telemetry_rows_with_fallback(run: InferenceRun) -> list[tuple[str, str]]:
 | A4 | The existing `stream_chat_completion` function can be reused for the fallback primary attempt without modification. | Fallback Scenario Design | The function already accepts `strategy` parameter and builds the body from `strategy_payload()`. If `strategy_payload()` is updated to include `provider`, the primary attempt will send `allow_fallbacks: false`. [VERIFIED: src/openrouter_demo/client.py:83-92 — body construction from strategy_payload] |
 | A5 | `ui.switch` is the correct NiceGUI component for the fallback toggle. | UI Code Examples | If NiceGUI uses a different component name, the toggle implementation needs adjustment. [ASSUMED — based on training knowledge] |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Will the nonexistent model slug produce a 404 or a different error?**
    - What we know: OpenRouter returns errors for unknown models. The `OpenRouterHTTPError` class captures status codes. [VERIFIED: src/openrouter_demo/client.py:19-30]
    - What's unclear: The exact status code and error message format for a nonexistent model with `allow_fallbacks: false`.
-   - Recommendation: Handle any `OpenRouterError` subclass as primary failure evidence. The specific error message is captured in `AttemptRecord.error_message` regardless of status code. Manual smoke test will reveal the exact error.
+   - RESOLVED: Handle any `OpenRouterError` subclass as primary failure evidence. The specific error message is captured in `AttemptRecord.error_message` regardless of status code. Manual smoke test will reveal the exact error.
 
 2. **Should the strategy selector be a dropdown or radio buttons?**
    - What we know: The screen spec says "Strategy selector" without specifying the control type. The UI/UX plan shows "Default / Cost / Latency" suggesting discrete options.
    - What's unclear: Whether NiceGUI's `ui.select` (dropdown) or `ui.radio` (radio buttons) is more appropriate for 3-4 options.
-   - Recommendation: Use `ui.select` (dropdown) — it's more compact and scales if custom strategy is added later. The existing Phase 2 UI uses buttons for sample prompts, but a strategy selector is a single-value control, not a multi-button action.
+   - RESOLVED: Use `ui.select` (dropdown) — it's more compact and scales if custom strategy is added later. The existing Phase 2 UI uses buttons for sample prompts, but a strategy selector is a single-value control, not a multi-button action.
 
 3. **Should the "Custom" strategy from the screen spec be implemented in Phase 3?**
    - What we know: The screen spec defines four strategy options: Default, Cost optimized, Latency optimized, and Custom. ROUTE-01 requires "at least default, cost-oriented, and latency-oriented." `ROUTING_STRATEGY_LABELS` already includes "custom". [VERIFIED: src/openrouter_demo/routing.py:6-11, tests/test_imports.py:46-51]
    - What's unclear: Whether Custom needs a UI control in Phase 3 or just the label/type seam.
-   - Recommendation: Do NOT add a Custom strategy UI control in Phase 3. ROUTE-01 only requires three strategies. The "custom" label exists in the type system for the `FALLBACK_PRIMARY_STRATEGY` (which uses `name="custom"`). A user-facing Custom strategy with explicit model/provider input is a potential Phase 4+ enhancement. Add it to the deferred list.
+   - RESOLVED: Do NOT add a Custom strategy UI control in Phase 3. ROUTE-01 only requires three strategies. The "custom" label exists in the type system for the `FALLBACK_PRIMARY_STRATEGY` (which uses `name="custom"`). A user-facing Custom strategy with explicit model/provider input is a potential Phase 4+ enhancement. Add it to the deferred list.
 
 ## Environment Availability
 

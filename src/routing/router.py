@@ -14,6 +14,8 @@ class RoutingStrategy:
 
 class Router:
     def __init__(self, providers: List[str]):
+        if not providers:
+            raise ValueError("Router requires a non-empty list of providers")
         self.providers = providers
         self._rr_index = 0
 

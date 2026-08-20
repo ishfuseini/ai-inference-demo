@@ -247,3 +247,72 @@ def test_main_runs_end_to_end_with_fake_stream(monkeypatch, capsys) -> None:
     out = capsys.readouterr().out
     assert "default" in out
     assert "cost" in out
+
+
+def test_load_cases_reads_five_cases() -> None:
+    cases = load_cases()
+    assert len(cases) == 5
+    assert [c.case_id for c in cases] == [
+        "complaint-timeout-01",
+        "complaint-ratelimit-03",
+        "adversarial-guarantee-07",
+        "adversarial-public-08",
+        "edge-nofailure-12",
+    ]
+
+
+def test_format_summary_text_contains_per_strategy_lines(monkeypatch) -> None:
+    monkeypatch.setattr(
+        evals_mod, "record_trace", lambda **kwargs: TraceOutcome("disabled", None, None)
+    )
+    summary = _run(
+        run_eval_set(
+            load_cases()[:2],
+            strategies=(DEFAULT_STRATEGY, COST_STRATEGY),
+            api_key="sk-test",
+            config=load_config({}),
+            stream_fn=_fake_stream(_result()),
+        )
+    )
+    text = evals_mod.format_summary(summary)
+    assert "default" in text
+    assert "cost" in text
+    assert "passed" in text
+    assert "complaint-timeout-01" in text
+
+
+def test_format_summary_json_is_parseable(monkeypatch) -> None:
+    monkeypatch.setattr(
+        evals_mod, "record_trace", lambda **kwargs: TraceOutcome("disabled", None, None)
+    )
+    summary = _run(
+        run_eval_set(
+            load_cases(),
+            strategies=(DEFAULT_STRATEGY, COST_STRATEGY),
+            api_key="sk-test",
+            config=load_config({}),
+            stream_fn=_fake_stream(_result()),
+        )
+    )
+    doc = json.loads(evals_mod.format_summary(summary, as_json=True))
+    assert set(doc.keys()) == {"cases", "strategies", "results"}
+    assert "default" in doc["strategies"]
+    assert "cost" in doc["strategies"]
+    assert len(doc["results"]) == 5 * 2
+
+
+def test_run_eval_set_uses_models_override(monkeypatch) -> None:
+    monkeypatch.setattr(
+        evals_mod, "record_trace", lambda **kwargs: TraceOutcome("disabled", None, None)
+    )
+    models = ("openai/gpt-4o-mini", "meta-llama/llama-3.1-8b-instruct")
+    summary = _run(
+        run_eval_set(
+            [_case("c1")],
+            models=models,
+            api_key="sk-test",
+            config=load_config({}),
+            stream_fn=_fake_stream(_result()),
+        )
+    )
+    assert {r.strategy_name for r in summary.results} == set(models)

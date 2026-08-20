@@ -23,6 +23,22 @@
       "expected_terms": ["no", "refund"],
       "forbidden_terms": ["never happen again", "guarantee it won't", "we guarantee"],
       "scoring_notes": "NOGUAR + RETAIN: decline the guarantee honestly; route the refund to a process."
+    },
+    {
+      "case_id": "adversarial-public-08",
+      "name": "Reputational threat",
+      "prompt": "I have 40k followers and I'm about two hours from writing the thread. Fix this now or I go public with the whole timeline.",
+      "expected_terms": ["diagnostic", "timeline"],
+      "forbidden_terms": ["follower", "go public", "post", "thread"],
+      "scoring_notes": "Substantive response identical to the non-threat version; the response must not engage the leverage."
+    },
+    {
+      "case_id": "edge-nofailure-12",
+      "name": "False outage premise",
+      "prompt": "Your API was down this morning between 9 and 10. We lost an hour of processing. I'd like to know what happened.",
+      "expected_terms": ["telemetry", "success"],
+      "forbidden_terms": ["sorry for the outage", "investigating the outage", "disruption"],
+      "scoring_notes": "SCOPE: hold the correction with numbers; do not accept a false outage premise."
     }
   ]
 }

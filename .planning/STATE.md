@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 3
-current_phase_name: Routing and Fallback Demo
+current_phase: 4
+current_phase_name: Telemetry, Repeat, and Observability
 status: planning
-stopped_at: Phase 2 complete
-last_updated: "2026-08-19T17:06:39.610Z"
+stopped_at: Phase 3 complete
+last_updated: "2026-08-19T22:53:03.494Z"
 progress:
   total_phases: 6
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  completed_phases: 3
+  total_plans: 7
+  completed_plans: 7
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-08-19)
 
 **Core value:** Make production inference behavior visible and defensible in a five-minute interview demo.
-**Current focus:** Phase 3: Routing and Fallback Demo
+**Current focus:** Phase 4: Telemetry, Repeat, and Observability
 
 ## Current Position
 
@@ -38,10 +38,10 @@ Progress: [##########] 100%
 
 | Metric | Current |
 |--------|---------|
-| Phases complete | 2/6 |
+| Phases complete | 3/6 |
 | Requirements mapped | 39/39 |
-| Requirements complete | 12/39 |
-| Plans complete | 5 |
+| Requirements complete | 18/39 |
+| Plans complete | 7 |
 
 ## Accumulated Context
 
@@ -52,10 +52,13 @@ Progress: [##########] 100%
 - Keep OpenRouter integration direct and inspectable.
 - Keep Langfuse optional.
 - Use `uv`, Ruff, and pytest as the quality gate path.
+- Use client-side two-attempt orchestration for the fallback demo (server-side `models` array hides primary failure).
+- `FALLBACK_PRIMARY_STRATEGY` uses `name="custom"` and is excluded from the selectable `STRATEGIES` dict.
+- `strategy_payload()` emits a `provider` key only when `provider_preferences` is set.
 
 ### Todos
 
-- Plan Phase 3 routing and fallback demo.
+- Plan Phase 4 telemetry, repeat, and observability.
 
 ### Blockers
 
@@ -64,10 +67,10 @@ Progress: [##########] 100%
 ## Session Continuity
 
 **Last session:** 2026-08-19T17:06:39.610Z
-**Stopped at:** Phase 2 complete
+**Stopped at:** Phase 3 complete
 **Resume file:** .planning/ROADMAP.md
 
-Phase 2 added the default-route streaming inference console: prompt/sample prompt controls, guarded OpenRouter run button, progressive response panel, telemetry rows, and run history. Phase 3 can add strategy selection and fallback behavior.
+Phase 3 added strategy selection (default/cost/latency), provider routing payloads, and a reproducible fallback scenario. The fallback path uses client-side two-attempt orchestration with a deterministic primary failure (nonexistent model, `allow_fallbacks: false`) followed by a real fallback attempt, preserving both attempts as `FallbackEvidence`. Phase 4 can add repeat/cache observations and Langfuse trace links.
 
 ---
-*Last updated: 2026-08-19 after Phase 2 execution*
+*Last updated: 2026-08-19 after Phase 3 execution*

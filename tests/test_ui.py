@@ -6,18 +6,22 @@ from openrouter_demo.client import OpenRouterHTTPError
 from openrouter_demo.history import RunHistory
 from openrouter_demo.models import (
     UNAVAILABLE,
+    AttemptRecord,
+    FallbackEvidence,
     InferenceRun,
     Status,
     StreamChunk,
     StreamedResult,
     TelemetryEvidence,
 )
-from openrouter_demo.routing import DEFAULT_STRATEGY
+from openrouter_demo.routing import COST_STRATEGY, DEFAULT_STRATEGY, LATENCY_STRATEGY, STRATEGIES
 from openrouter_demo.ui import (
+    FALLBACK_SUCCESS_RESPONSE,
     STREAMING_RESPONSE,
     _format_cost,
     _format_metadata,
     _history_rows,
+    _run_fallback_inference,
     _run_inference,
     _telemetry_rows,
 )
@@ -28,7 +32,9 @@ def _run(coro):
 
 
 def test_run_inference_records_successful_stream() -> None:
-    async def fake_stream(*_args: object, **_kwargs: object) -> AsyncIterator[StreamChunk | StreamedResult]:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
         yield StreamChunk("Hello ")
         yield StreamChunk("there")
         yield StreamedResult(
@@ -43,7 +49,11 @@ def test_run_inference_records_successful_stream() -> None:
         )
 
     history = RunHistory()
-    run = _run(_run_inference("Explain streaming", api_key="sk-test", history=history, stream_fn=fake_stream))
+    run = _run(
+        _run_inference(
+            "Explain streaming", api_key="sk-test", history=history, stream_fn=fake_stream
+        )
+    )
 
     assert run.status is Status.SUCCEEDED
     assert run.streamed_text == "Hello there"
@@ -56,7 +66,9 @@ def test_run_inference_records_successful_stream() -> None:
 
 
 def test_run_inference_preserves_unavailable_metadata() -> None:
-    async def fake_stream(*_args: object, **_kwargs: object) -> AsyncIterator[StreamChunk | StreamedResult]:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
         yield StreamedResult(
             text="done",
             model=UNAVAILABLE,
@@ -68,7 +80,9 @@ def test_run_inference_preserves_unavailable_metadata() -> None:
             latency_ms=12,
         )
 
-    run = _run(_run_inference("Prompt", api_key="sk-test", history=RunHistory(), stream_fn=fake_stream))
+    run = _run(
+        _run_inference("Prompt", api_key="sk-test", history=RunHistory(), stream_fn=fake_stream)
+    )
 
     assert run.telemetry is not None
     assert run.telemetry.model is UNAVAILABLE
@@ -80,7 +94,9 @@ def test_run_inference_preserves_unavailable_metadata() -> None:
 
 
 def test_run_inference_records_partial_text_on_stream_failure() -> None:
-    async def fake_stream(*_args: object, **_kwargs: object) -> AsyncIterator[StreamChunk | StreamedResult]:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
         yield StreamChunk("partial")
         raise OpenRouterHTTPError("provider failed", status_code=500, partial_text="partial")
 
@@ -95,7 +111,9 @@ def test_run_inference_records_partial_text_on_stream_failure() -> None:
 
 
 def test_run_inference_rejects_blank_prompt() -> None:
-    async def fake_stream(*_args: object, **_kwargs: object) -> AsyncIterator[StreamChunk | StreamedResult]:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
         raise AssertionError("blank prompts must not start a request")
 
     try:
@@ -140,6 +158,7 @@ def test_telemetry_and_history_rows_render_unavailable_copy() -> None:
         "15 ms",
         "Unavailable from selected route/provider.",
         "Cost metadata was not returned for this route/provider.",
+        "—",
     )
 
 
@@ -169,3 +188,317 @@ def test_telemetry_rows_streaming_state_copy() -> None:
     rows = dict(_telemetry_rows(None, is_running=True))
     assert rows["Status"] == STREAMING_RESPONSE
     assert rows["Latency"] == "Latency was not returned for this route/provider."
+
+
+def test_run_inference_records_cost_strategy_name() -> None:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
+        yield StreamedResult(
+            text="done",
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+            latency_ms=200,
+        )
+
+    run = _run(
+        _run_inference(
+            "Prompt",
+            api_key="sk-test",
+            history=RunHistory(),
+            stream_fn=fake_stream,
+            strategy=COST_STRATEGY,
+        )
+    )
+    assert run.strategy_name == "cost"
+
+
+def test_run_inference_records_latency_strategy_name() -> None:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
+        yield StreamedResult(
+            text="done",
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+            latency_ms=100,
+        )
+
+    run = _run(
+        _run_inference(
+            "Prompt",
+            api_key="sk-test",
+            history=RunHistory(),
+            stream_fn=fake_stream,
+            strategy=LATENCY_STRATEGY,
+        )
+    )
+    assert run.strategy_name == "latency"
+
+
+def test_strategies_dict_contains_three_selectable_strategies() -> None:
+    assert set(STRATEGIES.keys()) == {"default", "cost", "latency"}
+
+
+def test_history_rows_include_fallback_column() -> None:
+    run = InferenceRun(
+        run_id="run-1",
+        prompt="Prompt",
+        strategy_name=DEFAULT_STRATEGY.name,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        status=Status.SUCCEEDED,
+        streamed_text="done",
+        error_message=None,
+        telemetry=TelemetryEvidence(
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            latency_ms=200,
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+        ),
+    )
+    history = RunHistory()
+    history.append(run)
+
+    rows = _history_rows(history)
+    assert len(rows[0]) == 8
+    assert rows[0][-1] == "—"
+
+    primary = AttemptRecord(
+        model="nonexistent/fake-model-for-demo",
+        provider=UNAVAILABLE,
+        status=Status.FAILED,
+        error_message="OpenRouter request failed (404)",
+        latency_ms=12,
+        prompt_tokens=UNAVAILABLE,
+        completion_tokens=UNAVAILABLE,
+        total_tokens=UNAVAILABLE,
+        cost_usd=UNAVAILABLE,
+    )
+    fallback = AttemptRecord(
+        model="openai/gpt-4o-mini",
+        provider="OpenAI",
+        status=Status.SUCCEEDED,
+        error_message=None,
+        latency_ms=200,
+        prompt_tokens=3,
+        completion_tokens=4,
+        total_tokens=7,
+        cost_usd=0.001,
+    )
+    fallback_run = InferenceRun(
+        run_id="run-2",
+        prompt="Prompt",
+        strategy_name=DEFAULT_STRATEGY.name,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        status=Status.FALLBACK_SUCCEEDED,
+        streamed_text="Fallback response",
+        error_message=None,
+        telemetry=TelemetryEvidence(
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            latency_ms=200,
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+        ),
+        fallback_evidence=FallbackEvidence(primary=primary, fallback=fallback, simulated=True),
+    )
+    history.append(fallback_run)
+    rows = _history_rows(history)
+    assert rows[1][-1] == "Yes"
+
+
+def test_telemetry_rows_fallback_success_status() -> None:
+    primary = AttemptRecord(
+        model="nonexistent/fake-model-for-demo",
+        provider=UNAVAILABLE,
+        status=Status.FAILED,
+        error_message="OpenRouter request failed (404)",
+        latency_ms=12,
+        prompt_tokens=UNAVAILABLE,
+        completion_tokens=UNAVAILABLE,
+        total_tokens=UNAVAILABLE,
+        cost_usd=UNAVAILABLE,
+    )
+    fallback = AttemptRecord(
+        model="openai/gpt-4o-mini",
+        provider="OpenAI",
+        status=Status.SUCCEEDED,
+        error_message=None,
+        latency_ms=200,
+        prompt_tokens=3,
+        completion_tokens=4,
+        total_tokens=7,
+        cost_usd=0.001,
+    )
+    run = InferenceRun(
+        run_id="run-fb",
+        prompt="Prompt",
+        strategy_name=DEFAULT_STRATEGY.name,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        status=Status.FALLBACK_SUCCEEDED,
+        streamed_text="Fallback response",
+        error_message=None,
+        telemetry=TelemetryEvidence(
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            latency_ms=200,
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+        ),
+        fallback_evidence=FallbackEvidence(primary=primary, fallback=fallback, simulated=True),
+    )
+
+    rows = dict(_telemetry_rows(run))
+    assert rows["Status"] == FALLBACK_SUCCESS_RESPONSE
+
+
+def test_run_fallback_inference_produces_fallback_succeeded_run() -> None:
+    call_count = 0
+
+    async def dual_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise OpenRouterHTTPError(
+                "OpenRouter request failed (404)", status_code=404, partial_text=""
+            )
+        yield StreamChunk("Fallback ")
+        yield StreamChunk("response")
+        yield StreamedResult(
+            text="Fallback response",
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+            latency_ms=200,
+        )
+
+    run = _run(
+        _run_fallback_inference(
+            "test",
+            api_key="sk-test",
+            history=RunHistory(),
+            fallback_strategy=DEFAULT_STRATEGY,
+            stream_fn=dual_stream,
+        )
+    )
+
+    assert run.status is Status.FALLBACK_SUCCEEDED
+    assert run.fallback_evidence is not None
+    assert run.fallback_evidence.primary.status is Status.FAILED
+    assert run.fallback_evidence.fallback.status is Status.SUCCEEDED
+    assert run.streamed_text == "Fallback response"
+    assert run.telemetry is not None
+    assert run.telemetry.model == "openai/gpt-4o-mini"
+    assert run.telemetry.provider == "OpenAI"
+
+
+def test_telemetry_rows_render_fallback_evidence() -> None:
+    primary = AttemptRecord(
+        model="nonexistent/fake-model-for-demo",
+        provider=UNAVAILABLE,
+        status=Status.FAILED,
+        error_message="OpenRouter request failed (404)",
+        latency_ms=12,
+        prompt_tokens=UNAVAILABLE,
+        completion_tokens=UNAVAILABLE,
+        total_tokens=UNAVAILABLE,
+        cost_usd=UNAVAILABLE,
+    )
+    fallback = AttemptRecord(
+        model="openai/gpt-4o-mini",
+        provider="OpenAI",
+        status=Status.SUCCEEDED,
+        error_message=None,
+        latency_ms=200,
+        prompt_tokens=3,
+        completion_tokens=4,
+        total_tokens=7,
+        cost_usd=0.001,
+    )
+    run = InferenceRun(
+        run_id="run-fb-evidence",
+        prompt="Prompt",
+        strategy_name=DEFAULT_STRATEGY.name,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        status=Status.FALLBACK_SUCCEEDED,
+        streamed_text="Fallback response",
+        error_message=None,
+        telemetry=TelemetryEvidence(
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            latency_ms=200,
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+        ),
+        fallback_evidence=FallbackEvidence(primary=primary, fallback=fallback, simulated=True),
+    )
+
+    rows = dict(_telemetry_rows(run))
+    assert rows["Status"] == FALLBACK_SUCCESS_RESPONSE
+    assert rows["Primary status"] == "failed"
+    assert rows["Primary error"] == "OpenRouter request failed (404)"
+    assert rows["Fallback model"] == "openai/gpt-4o-mini"
+    assert rows["Fallback status"] == "succeeded"
+    assert rows["Failure type"] == "Simulated failure triggered for demo."
+
+
+def test_run_fallback_inference_appends_to_history() -> None:
+    call_count = 0
+
+    async def dual_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise OpenRouterHTTPError(
+                "OpenRouter request failed (404)", status_code=404, partial_text=""
+            )
+        yield StreamedResult(
+            text="Fallback response",
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+            latency_ms=200,
+        )
+
+    history = RunHistory()
+    run = _run(
+        _run_fallback_inference(
+            "test",
+            api_key="sk-test",
+            history=history,
+            fallback_strategy=DEFAULT_STRATEGY,
+            stream_fn=dual_stream,
+        )
+    )
+    assert history.all() == [run]

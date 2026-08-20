@@ -1,12 +1,12 @@
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 
 @dataclass
 class FallbackAttempt:
     provider: str
-    reason: Optional[str]
-    latency_ms: Optional[float]
+    reason: str | None
+    latency_ms: float | None
 
 
 @dataclass
@@ -15,10 +15,10 @@ class RunRecord:
     timestamp: str
     strategy: str
     provider: str
-    model: Optional[str]
-    latency_ms: Optional[float]
-    tokens: Optional[int]
-    cost: Optional[float]
-    fallback_attempts: List[FallbackAttempt]
-    trace_id: Optional[str]
-    raw_response: Optional[Dict[str, Any]]
+    model: str | None
+    latency_ms: float | None
+    tokens: int | None
+    cost: float | None
+    fallback_attempts: list[FallbackAttempt]
+    trace_id: str | None
+    raw_response: dict[str, Any] | None

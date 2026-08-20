@@ -25,12 +25,12 @@
 
 ### Routing and Fallback
 
-- [ ] **ROUTE-01**: User can choose at least default, cost-oriented, and latency-oriented routing strategies.
-- [ ] **ROUTE-02**: UI explains each strategy tradeoff before a run.
-- [ ] **ROUTE-03**: Completed run shows the selected strategy and the actual route/model evidence returned by the request.
-- [ ] **ROUTE-04**: User can trigger a reproducible fallback scenario.
-- [ ] **ROUTE-05**: Fallback scenario shows the failed primary attempt, failure reason or timeout, fallback route, and final result.
-- [ ] **ROUTE-06**: Successful fallback does not hide primary failure evidence.
+- [x] **ROUTE-01**: User can choose at least default, cost-oriented, and latency-oriented routing strategies.
+- [x] **ROUTE-02**: UI explains each strategy tradeoff before a run.
+- [x] **ROUTE-03**: Completed run shows the selected strategy and the actual route/model evidence returned by the request.
+- [x] **ROUTE-04**: User can trigger a reproducible fallback scenario.
+- [x] **ROUTE-05**: Fallback scenario shows the failed primary attempt, failure reason or timeout, fallback route, and final result.
+- [x] **ROUTE-06**: Successful fallback does not hide primary failure evidence.
 
 ### Telemetry, Repeat, and Observability
 
@@ -101,12 +101,12 @@
 | INF-04 | Phase 2 | Complete |
 | INF-05 | Phase 2 | Complete |
 | INF-06 | Phase 2 | Complete |
-| ROUTE-01 | Phase 3 | Pending |
-| ROUTE-02 | Phase 3 | Pending |
-| ROUTE-03 | Phase 3 | Pending |
-| ROUTE-04 | Phase 3 | Pending |
-| ROUTE-05 | Phase 3 | Pending |
-| ROUTE-06 | Phase 3 | Pending |
+| ROUTE-01 | Phase 3 | Complete |
+| ROUTE-02 | Phase 3 | Complete |
+| ROUTE-03 | Phase 3 | Complete |
+| ROUTE-04 | Phase 3 | Complete |
+| ROUTE-05 | Phase 3 | Complete |
+| ROUTE-06 | Phase 3 | Complete |
 | OBS-01 | Phase 4 | Pending |
 | OBS-02 | Phase 4 | Pending |
 | OBS-03 | Phase 4 | Pending |

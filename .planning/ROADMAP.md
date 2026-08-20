@@ -8,7 +8,7 @@
 
 - [x] **Phase 1: Runnable Skeleton and Config** - Reviewer can install, configure, and launch the local app shell.
 - [x] **Phase 2: Streaming Inference Evidence** - User can run a live streaming OpenRouter request with basic telemetry.
-- [ ] **Phase 3: Routing and Fallback Demo** - User can compare routing strategies and inspect reproducible fallback behavior.
+- [x] **Phase 3: Routing and Fallback Demo** - User can compare routing strategies and inspect reproducible fallback behavior.
 - [ ] **Phase 4: Telemetry, Repeat, and Observability** - User can compare runs with honest metadata, repeat/cache observations, and optional Langfuse traces.
 - [ ] **Phase 5: Deterministic Evals** - User can run small evals and compare model/strategy quality with telemetry evidence.
 - [ ] **Phase 6: Interview Walkthrough and Quality Gates** - Reviewer can follow docs and trust focused tests/lint checks.
@@ -84,7 +84,16 @@ Plans:
   4. Fallback scenario shows primary attempt, failure or timeout reason, fallback route, and final result.
   5. A successful fallback never hides the failed primary attempt.
 
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+**Wave 1**
+
+- [x] 03-01-PLAN.md — Strategy selection vertical slice: routing strategies, model types, UI selector, strategy payloads
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 03-02-PLAN.md — Fallback scenario vertical slice: two-attempt orchestration, UI toggle, fallback evidence rendering
+
 **UI hint**: yes
 
 ### Phase 4: Telemetry, Repeat, and Observability
@@ -146,7 +155,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Runnable Skeleton and Config | 3/3 | Complete    | 2026-08-18 |
 | 2. Streaming Inference Evidence | 2/2 | Complete    | 2026-08-19 |
-| 3. Routing and Fallback Demo | 0/0 | Complete | 2026-08-19 |
+| 3. Routing and Fallback Demo | 2/2 | Complete | 2026-08-19 |
 | 4. Telemetry, Repeat, and Observability | 0/0 | Not started | - |
 | 5. Deterministic Evals | 0/0 | Not started | - |
 | 6. Interview Walkthrough and Quality Gates | 0/0 | Not started | - |

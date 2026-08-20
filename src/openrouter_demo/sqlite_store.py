@@ -1,12 +1,11 @@
-import sqlite3
 import json
+import sqlite3
 import threading
-from pathlib import Path
 from dataclasses import asdict
-from typing import Optional, List
 from datetime import datetime
+from pathlib import Path
 
-from openrouter_demo.models import InferenceRun, TelemetryEvidence, Status
+from openrouter_demo.models import InferenceRun, Status, TelemetryEvidence
 
 
 class SQLiteRunHistory:
@@ -63,7 +62,7 @@ class SQLiteRunHistory:
             # enforce max runs: delete any runs older than the most recent `_max_runs`
             cur.execute(
                 "SELECT run_id FROM runs ORDER BY started_at DESC LIMIT -1 OFFSET ?",
-                (self._max_runs,)
+                (self._max_runs,),
             )
             rows = cur.fetchall()
             if rows:
@@ -71,7 +70,7 @@ class SQLiteRunHistory:
                 cur.executemany("DELETE FROM runs WHERE run_id = ?", [(i,) for i in ids_to_delete])
                 self._conn.commit()
 
-    def all(self, limit: int | None = None) -> List[InferenceRun]:
+    def all(self, limit: int | None = None) -> list[InferenceRun]:
         with self._lock:
             cur = self._conn.cursor()
             q = "SELECT * FROM runs ORDER BY started_at DESC"
@@ -82,7 +81,7 @@ class SQLiteRunHistory:
                 rows = cur.execute(q).fetchall()
             return [self._row_to_run(r) for r in rows]
 
-    def get(self, run_id: str) -> Optional[InferenceRun]:
+    def get(self, run_id: str) -> InferenceRun | None:
         with self._lock:
             cur = self._conn.cursor()
             row = cur.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()

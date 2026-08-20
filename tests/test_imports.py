@@ -11,10 +11,16 @@ from openrouter_demo.config import (
 )
 from openrouter_demo.evals import PhaseNotImplementedError as EvalsNotImplemented
 from openrouter_demo.evals import main as evals_main
-from openrouter_demo.models import UNAVAILABLE, Unavailable
-from openrouter_demo.routing import ROUTING_STRATEGY_LABELS
+from openrouter_demo.models import UNAVAILABLE, AttemptRecord, FallbackEvidence, Status, Unavailable
+from openrouter_demo.routing import (
+    COST_STRATEGY,
+    FALLBACK_PRIMARY_STRATEGY,
+    LATENCY_STRATEGY,
+    ROUTING_STRATEGY_LABELS,
+    STRATEGIES,
+)
 from openrouter_demo.scenarios import PhaseNotImplementedError as ScenarioNotImplemented
-from openrouter_demo.scenarios import run_scenario
+from openrouter_demo.scenarios import run_fallback_scenario
 from openrouter_demo.telemetry import trace_readiness_from_config
 
 
@@ -35,8 +41,8 @@ def test_required_modules_import() -> None:
 
 
 def test_live_boundaries_raise_honest_phase_errors() -> None:
-    with pytest.raises(ScenarioNotImplemented, match="later phases"):
-        run_scenario()
+    assert callable(run_fallback_scenario)
+    assert issubclass(ScenarioNotImplemented, NotImplementedError)
     with pytest.raises(EvalsNotImplemented, match="Phase 5"):
         evals_main()
 
@@ -50,6 +56,16 @@ def test_routing_labels_do_not_claim_provider_results() -> None:
     }
 
 
+def test_phase3_types_importable() -> None:
+    assert Status.FALLBACK_SUCCEEDED == "fallback_succeeded"
+    assert AttemptRecord is not None
+    assert FallbackEvidence is not None
+    assert COST_STRATEGY.name == "cost"
+    assert LATENCY_STRATEGY.name == "latency"
+    assert FALLBACK_PRIMARY_STRATEGY.name == "custom"
+    assert set(STRATEGIES.keys()) == {"default", "cost", "latency"}
+
+
 def test_unavailable_metadata_is_not_zero() -> None:
     assert isinstance(UNAVAILABLE, Unavailable)
     assert UNAVAILABLE != 0
@@ -58,11 +74,15 @@ def test_unavailable_metadata_is_not_zero() -> None:
 
 def test_trace_readiness_uses_config_without_creating_traces() -> None:
     disabled = trace_readiness_from_config(load_config({}))
-    enabled = trace_readiness_from_config(load_config({
-        LANGFUSE_PUBLIC_KEY: "pk",
-        LANGFUSE_SECRET_KEY: "sk",
-        LANGFUSE_BASE_URL: "https://cloud.langfuse.com",
-    }))
+    enabled = trace_readiness_from_config(
+        load_config(
+            {
+                LANGFUSE_PUBLIC_KEY: "pk",
+                LANGFUSE_SECRET_KEY: "sk",
+                LANGFUSE_BASE_URL: "https://cloud.langfuse.com",
+            }
+        )
+    )
     assert disabled.enabled is False
     assert enabled.enabled is True
 

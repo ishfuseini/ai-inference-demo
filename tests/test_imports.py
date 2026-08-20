@@ -1,8 +1,7 @@
 import dataclasses
 import importlib
+import json
 from pathlib import Path
-
-import pytest
 
 from openrouter_demo.config import (
     LANGFUSE_BASE_URL,
@@ -10,7 +9,6 @@ from openrouter_demo.config import (
     LANGFUSE_SECRET_KEY,
     load_config,
 )
-from openrouter_demo.evals import PhaseNotImplementedError as EvalsNotImplemented
 from openrouter_demo.evals import main as evals_main
 from openrouter_demo.models import UNAVAILABLE, AttemptRecord, FallbackEvidence, Status, Unavailable
 from openrouter_demo.routing import (
@@ -44,8 +42,7 @@ def test_required_modules_import() -> None:
 def test_live_boundaries_raise_honest_phase_errors() -> None:
     assert callable(run_fallback_scenario)
     assert issubclass(ScenarioNotImplemented, NotImplementedError)
-    with pytest.raises(EvalsNotImplemented, match="Phase 5"):
-        evals_main()
+    assert callable(evals_main)
 
 
 def test_routing_labels_do_not_claim_provider_results() -> None:
@@ -88,9 +85,11 @@ def test_trace_readiness_uses_config_without_creating_traces() -> None:
     assert enabled.enabled is True
 
 
-def test_evals_directory_has_no_phase1_cases() -> None:
+def test_evals_cases_json_has_three_to_five_cases() -> None:
     assert Path("evals/.gitkeep").exists()
-    assert not Path("evals/cases.json").exists()
+    assert Path("evals/cases.json").exists()
+    data = json.loads(Path("evals/cases.json").read_text())
+    assert 3 <= len(data["cases"]) <= 5
 
 
 def test_phase4_types_and_fields_importable() -> None:

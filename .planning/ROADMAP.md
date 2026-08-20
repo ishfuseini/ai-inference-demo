@@ -164,7 +164,20 @@ Plans:
   5. `uv run pytest` and `uv run ruff check .` pass.
   6. Reviewer can run the core demo with only `OPENROUTER_API_KEY`.
 
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 1**
+
+- [ ] 06-01-PLAN.md — Docs slice: create docs/architecture.md, rewrite README.md, move failure tree to docs/failure-tree.md, fix quickstart, and pin with tests/test_docs.py.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 06-02-PLAN.md — Guard-tests slice: DOC-04 UI-framing guard in tests/test_ui.py and DOC-05 focused-coverage guard in tests/test_docs.py.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 06-03-PLAN.md — Quality-gate confirmation: uv run pytest (DOC-06), uv run ruff check . (DOC-07), and single-credential demo confirmation (DOC-08).
+
 **UI hint**: yes
 
 ## Progress
@@ -176,7 +189,7 @@ Plans:
 | 3. Routing and Fallback Demo | 2/2 | Complete | 2026-08-19 |
 | 4. Telemetry, Repeat, and Observability | 3/3 | Complete | 2026-08-19 |
 | 5. Deterministic Evals | 1/1 | Complete    | 2026-08-20 |
-| 6. Interview Walkthrough and Quality Gates | 0/0 | Not started | - |
+| 6. Interview Walkthrough and Quality Gates | 0/3 | Not started | - |
 
 ## Coverage
 

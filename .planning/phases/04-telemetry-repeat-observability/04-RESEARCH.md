@@ -515,26 +515,30 @@ trace_url = client.get_trace_url(trace_id=trace_id)
 
 **If this table is empty:** not applicable — four assumptions logged above.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **SQLite vs in-memory history for OBS-07**
    - What we know: `app.py:16-18` wires `SQLiteRunHistory(db_path="data/runs.db")`; `REQUIREMENTS.md` Out of Scope says "Database persistence — Runtime history can stay in memory"; `RunHistory` (in-memory) is still used by all tests.
    - What's unclear: whether persistence across restart is intended or accidental.
    - Recommendation: keep `SQLiteRunHistory` (it's already wired and gives OBS-07 persistence), but fix the round-trip. If the user prefers in-memory, reverting `app.py` to `RunHistory()` is a one-line change.
+   - RESOLVED: 04-03.1 — keep `SQLiteRunHistory` and fix its round-trip.
 
 2. **`cost_details` key format for Langfuse**
    - What we know: type sig `Dict[str, float]` vs README example `cost_amount`/`cost_currency`.
    - What's unclear: accepted keys in 4.14.4.
    - Recommendation: use `usage_details` for tokens; put cost in `metadata` or gate `cost_details` behind a verify checkpoint.
+   - RESOLVED: 04-01.2 — use `usage_details` for tokens; put cost in `metadata` (opt out of ambiguous `cost_details` keys).
 
 3. **Repeat scenario shape**
    - What we know: `data-model.md` names `repeat_observation`; screen-spec lists a "Cache / repeat" telemetry row and a "Repeat previous prompt" action.
    - What's unclear: one scenario that runs the prompt twice internally vs a "Repeat" button that re-runs the last run and diffs against history.
    - Recommendation: implement both cheaply — a `run_repeat_scenario` for the deterministic two-run observation, plus a "Repeat" button that re-submits the last prompt/strategy.
+   - RESOLVED: 04-02.1 + 04-02.2 — implement `run_repeat_scenario` (two-run observation) plus a Repeat action in the UI.
 
 4. **Should `telemetry_schema.py` be removed or reconciled?**
    - What we know: it's unused dead code with a competing `RunRecord`/`FallbackAttempt` schema.
    - Recommendation: remove it (or fold it into a docstring on `TelemetryEvidence`) to keep one source of truth; confirm with the planner to keep the change surgical.
+   - RESOLVED: 04-03.3 — remove `telemetry_schema.py` (verified unused; keep one source of truth).
 
 ## Environment Availability
 

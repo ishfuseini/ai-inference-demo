@@ -111,7 +111,20 @@ Plans:
   5. Langfuse traces are created when configured and tracing disabled is visible when not configured.
   6. Recent run history supports comparison from the main UI.
 
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Normalized telemetry vertical slice: cache/trace fields, metadata header, conditional Langfuse.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-02-PLAN.md — Repeat/cache scenario slice: two-run observation with cache honesty + Repeat UI action.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04-03-PLAN.md — Persistence round-trip + history comparison slice.
+
 **UI hint**: yes
 
 ### Phase 5: Deterministic Evals

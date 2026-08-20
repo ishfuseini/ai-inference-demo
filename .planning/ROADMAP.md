@@ -1,5 +1,8 @@
 # Roadmap: OpenRouter Production Inference Lab
 
+> **This file is the authoritative roadmap for current and future work.**
+> Archived milestone roadmaps live in `.planning/milestones/v{version}-ROADMAP.md` and are read-only snapshots.
+
 **Created:** 2026-08-18
 **Mode:** Vertical MVP
 **Granularity:** Standard
@@ -20,7 +23,7 @@
 - [x] Phase 5: Deterministic Evals (1/1 plan) — completed 2026-08-20
 - [x] Phase 6: Interview Walkthrough and Quality Gates (3/3 plans) — completed 2026-08-20
 
-**Total:** 6 phases, 15 plans, 28 tasks, 39 requirements, 105 tests pass, ruff clean
+**Total:** 6 phases, 14 plans, 28 tasks, 39 requirements, 105 tests pass, ruff clean
 **Archive:** `.planning/milestones/v1.0-ROADMAP.md`
 
 </details>

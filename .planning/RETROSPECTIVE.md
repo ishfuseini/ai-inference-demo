@@ -5,7 +5,7 @@
 ## Milestone: v1.0 — MVP
 
 **Shipped:** 2026-08-20
-**Phases:** 6 | **Plans:** 15 | **Tasks:** 28 | **Timeline:** 3 days
+**Phases:** 6 | **Plans:** 14 | **Tasks:** 28 | **Timeline:** 3 days
 
 ### What Was Built
 - Runnable NiceGUI app with streaming OpenRouter inference, routing strategies (default/cost/latency), and client-side two-attempt fallback

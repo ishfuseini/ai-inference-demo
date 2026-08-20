@@ -1,6 +1,9 @@
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 OPENROUTER_API_KEY = "OPENROUTER_API_KEY"
 LANGFUSE_PUBLIC_KEY = "LANGFUSE_PUBLIC_KEY"
@@ -24,6 +27,8 @@ def _missing(environ: Mapping[str, str], names: tuple[str, ...]) -> tuple[str, .
 
 
 def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
+    if environ is None:
+        load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
     source = os.environ if environ is None else environ
     missing_required = _missing(source, REQUIRED_ENV_VARS)
     missing_langfuse = _missing(source, LANGFUSE_ENV_VARS)

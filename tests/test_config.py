@@ -28,6 +28,14 @@ def test_load_config_reads_os_environ(monkeypatch) -> None:
     assert load_config().openrouter_ready is True
 
 
+def test_load_config_reads_dotenv_file(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv(OPENROUTER_API_KEY, raising=False)
+    monkeypatch.chdir(tmp_path)
+    Path(".env").write_text(f"{OPENROUTER_API_KEY}=test-key\n")
+
+    assert load_config().openrouter_ready is True
+
+
 def test_langfuse_ready_requires_all_optional_vars() -> None:
     incomplete = load_config({LANGFUSE_PUBLIC_KEY: "pk"})
     only_secret = load_config({

@@ -26,13 +26,15 @@ uv sync
 
 ## Configure
 
-The app reads exported environment variables only and never parses `.env` files. Export the four variables below; `OPENROUTER_API_KEY` is required, and the three Langfuse variables are optional.
+Create a local `.env` file or export the four variables below. `OPENROUTER_API_KEY` is required, and the three Langfuse variables are optional. Exported environment variables take precedence over `.env` values.
 
 ```bash
-export OPENROUTER_API_KEY=
-export LANGFUSE_PUBLIC_KEY=
-export LANGFUSE_SECRET_KEY=
-export LANGFUSE_BASE_URL=
+cp .env.example .env
+# Fill in values in .env, or export them in your shell:
+# export OPENROUTER_API_KEY=
+# export LANGFUSE_PUBLIC_KEY=
+# export LANGFUSE_SECRET_KEY=
+# export LANGFUSE_BASE_URL=
 ```
 
 When `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_BASE_URL` are absent, the app launches with tracing visibly disabled rather than blocking.
@@ -67,4 +69,5 @@ uv run ruff check .
 ## Docs
 
 - `docs/architecture.md` — component boundaries and data flow.
+- `docs/content-editing-guide.md` — copy, labels, and documentation voice for future edits.
 - `docs/failure-tree.md` — how to debug a failed or degraded request.

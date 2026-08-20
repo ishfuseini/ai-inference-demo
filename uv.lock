@@ -831,6 +831,7 @@ dependencies = [
     { name = "httpx" },
     { name = "langfuse" },
     { name = "nicegui" },
+    { name = "python-dotenv" },
 ]
 
 [package.dev-dependencies]
@@ -844,6 +845,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "langfuse", specifier = ">=4.14.4" },
     { name = "nicegui", specifier = ">=3.16.0" },
+    { name = "python-dotenv", specifier = ">=1.2.3" },
 ]
 
 [package.metadata.requires-dev]

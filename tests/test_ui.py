@@ -24,6 +24,7 @@ from openrouter_demo.ui import (
     _format_cost,
     _format_metadata,
     _history_rows,
+    _history_trace_href,
     _run_fallback_inference,
     _run_inference,
     _run_repeat_inference,
@@ -164,7 +165,6 @@ def test_telemetry_and_history_rows_render_unavailable_copy() -> None:
         "Cost metadata was not returned for this route/provider.",
         "—",
         "—",
-        "—",
     )
 
 
@@ -278,8 +278,7 @@ def test_history_rows_include_fallback_column() -> None:
     history.append(run)
 
     rows = _history_rows(history)
-    assert len(rows[0]) == 10
-    assert rows[0][-3] == "—"
+    assert len(rows[0]) == 9
     assert rows[0][-2] == "—"
     assert rows[0][-1] == "—"
 
@@ -327,8 +326,7 @@ def test_history_rows_include_fallback_column() -> None:
     )
     history.append(fallback_run)
     rows = _history_rows(history)
-    assert rows[1][-3] == "Yes"
-    assert rows[1][-2] == "—"
+    assert rows[1][-2] == "Yes"
     assert rows[1][-1] == "—"
 
 
@@ -694,7 +692,7 @@ def test_run_repeat_inference_records_cache_hit() -> None:
     assert run.telemetry.cached_tokens == 10
 
 
-def test_history_rows_render_cache_and_trace_columns() -> None:
+def test_history_rows_render_cache_and_trace_link_target() -> None:
     run = InferenceRun(
         run_id="run-cache-trace",
         prompt="Prompt",
@@ -723,9 +721,9 @@ def test_history_rows_render_cache_and_trace_columns() -> None:
     history = RunHistory()
     history.append(run)
     rows = _history_rows(history)
-    assert len(rows[0]) == 10
-    assert rows[0][-2] == "hit (10)"
-    assert rows[0][-1] == "https://cloud.langfuse.com/traces/abc123"
+    assert len(rows[0]) == 9
+    assert rows[0][-1] == "hit (10)"
+    assert _history_trace_href(run) == "https://cloud.langfuse.com/traces/abc123"
 
 
 def test_comparison_rows_include_completed_runs() -> None:
@@ -757,8 +755,10 @@ def test_comparison_rows_include_completed_runs() -> None:
     history.append(_run("pending-model", Status.PENDING, completed=False))
 
     rows_all = _comparison_rows(history)
-    models_all = [row[0] for row in rows_all]
+    models_all = [row[1] for row in rows_all]
     assert len(rows_all) >= 2
+    assert rows_all[0][0] == "1"
+    assert rows_all[1][0] == "2"
     assert "openai/gpt-4o-mini" in models_all
     assert "openai/gpt-4o-mini-extra" in models_all
     assert "failed-model" not in models_all
@@ -767,7 +767,7 @@ def test_comparison_rows_include_completed_runs() -> None:
     rows_limited = _comparison_rows(history, limit=1)
     assert len(rows_limited) == 1
 
-    # Cache/trace labels in comparison rows must match history rows.
+    # Cache labels in comparison rows must match history rows; trace URL moves to run links.
     cache_trace_run = InferenceRun(
         run_id="run-compare-cache-trace",
         prompt="Prompt cache/trace",
@@ -800,8 +800,8 @@ def test_comparison_rows_include_completed_runs() -> None:
     comparison_rows = _comparison_rows(cache_trace_history)
     assert len(history_rows) == 1
     assert len(comparison_rows) == 1
-    assert comparison_rows[0][-2] == history_rows[0][-2] == "hit (10)"
-    assert comparison_rows[0][-1] == history_rows[0][-1] == "https://cloud.langfuse.com/traces/abc123"
+    assert comparison_rows[0][-1] == history_rows[0][-1] == "hit (10)"
+    assert _history_trace_href(cache_trace_run) == "https://cloud.langfuse.com/traces/abc123"
 
 
 def test_run_fallback_inference_appends_to_history() -> None:

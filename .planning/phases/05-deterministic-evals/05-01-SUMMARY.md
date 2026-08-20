@@ -23,7 +23,7 @@ tech-stack:
   patterns:
     - "Deterministic keyword scoring (expected_terms all present / forbidden_terms none present) with no LLM judge"
     - "Async case runner composing stream_chat_completion -> record_trace -> TelemetryEvidence -> EvalResult"
-    - "Injectible StreamFn for zero-network tests (mirrors tests/test_scenarios.py)"
+    - "Injectable StreamFn for zero-network tests (mirrors tests/test_scenarios.py)"
 
 key-files:
   created:

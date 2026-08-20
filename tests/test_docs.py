@@ -31,3 +31,25 @@ def test_failure_tree_and_quickstart_paths_resolve() -> None:
     assert "PYTHONPATH=src uv run python -m openrouter_demo.evals" in Path(
         "docs/specs/quickstart.md"
     ).read_text()
+
+
+def test_focused_test_coverage() -> None:
+    assert Path("tests/test_client.py").exists()
+    assert "def test_stream_401_raises_auth_error" in Path("tests/test_client.py").read_text()
+    assert Path("tests/test_ui.py").exists()
+
+    assert Path("tests/test_routing.py").exists()
+    assert (
+        "def test_strategies_dict_contains_three_selectable_strategies"
+        in Path("tests/test_routing.py").read_text()
+    )
+
+    assert Path("tests/test_telemetry.py").exists()
+    assert (
+        "def test_telemetry_evidence_round_trip_preserves_sentinels"
+        in Path("tests/test_telemetry.py").read_text()
+    )
+    assert Path("tests/test_sqlite_store.py").exists()
+
+    assert Path("tests/test_evals.py").exists()
+    assert "def test_score_response_passes_and_fails" in Path("tests/test_evals.py").read_text()

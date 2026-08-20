@@ -1,15 +1,27 @@
+import asyncio
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 from openrouter_demo.client import _extract_cache
+from openrouter_demo.config import (
+    LANGFUSE_BASE_URL,
+    LANGFUSE_PUBLIC_KEY,
+    LANGFUSE_SECRET_KEY,
+    load_config,
+)
+from openrouter_demo.history import RunHistory
 from openrouter_demo.models import (
     UNAVAILABLE,
     InferenceRun,
     Status,
+    StreamChunk,
+    StreamedResult,
     TelemetryEvidence,
     Unavailable,
 )
 from openrouter_demo.routing import DEFAULT_STRATEGY
-from openrouter_demo.ui import _telemetry_rows
+from openrouter_demo.telemetry import TraceOutcome, record_trace
+from openrouter_demo.ui import _run_inference, _telemetry_rows
 
 
 def test_telemetry_evidence_defaults_cache_and_trace_fields() -> None:
@@ -122,3 +134,72 @@ def test_unavailable_sentinel_is_not_zero_or_dict() -> None:
     assert isinstance(UNAVAILABLE, Unavailable)
     assert not UNAVAILABLE
     assert UNAVAILABLE != 0
+
+
+def test_record_trace_disabled_without_credentials() -> None:
+    outcome = record_trace(
+        load_config({}),
+        name="n",
+        model="m",
+        input={},
+        output="o",
+        usage_details={},
+    )
+    assert outcome == TraceOutcome(status="disabled", trace_id=None, trace_url=None)
+
+
+def test_record_trace_failed_with_unreachable_langfuse(monkeypatch) -> None:
+    monkeypatch.setenv(LANGFUSE_PUBLIC_KEY, "pk-lf-1234567890")
+    monkeypatch.setenv(LANGFUSE_SECRET_KEY, "sk-lf-1234567890")
+    monkeypatch.setenv(LANGFUSE_BASE_URL, "http://127.0.0.1:1")
+    outcome = record_trace(
+        load_config(),
+        name="n",
+        model="m",
+        input={},
+        output="o",
+        usage_details={},
+    )
+    assert outcome.status == "failed"
+    assert outcome.trace_id is None
+    assert outcome.trace_url is None
+
+
+def test_run_inference_trace_input_contains_no_api_key(monkeypatch) -> None:
+    captured: dict = {}
+
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
+        yield StreamChunk("hi")
+        yield StreamedResult(
+            text="hi",
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+            latency_ms=10,
+        )
+
+    def fake_record_trace(config, *, name, model, input, output, usage_details):
+        captured["input"] = input
+        return TraceOutcome(status="disabled", trace_id=None, trace_url=None)
+
+    monkeypatch.setattr("openrouter_demo.ui.record_trace", fake_record_trace)
+
+    run = asyncio.run(
+        _run_inference(
+            "Prompt",
+            api_key="sk-test",
+            history=RunHistory(),
+            stream_fn=fake_stream,
+            config=load_config({}),
+        )
+    )
+
+    assert run.status is Status.SUCCEEDED
+    assert captured["input"] == {"prompt": "Prompt"}
+    assert "api_key" not in captured["input"]
+    assert "OPENROUTER_API_KEY" not in captured["input"]

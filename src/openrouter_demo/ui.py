@@ -13,6 +13,7 @@ from openrouter_demo.client import OpenRouterError, stream_chat_completion
 from openrouter_demo.config import LANGFUSE_ENV_VARS, OPENROUTER_API_KEY, AppConfig
 from openrouter_demo.history import RunHistory
 from openrouter_demo.models import (
+    UNAVAILABLE,
     AttemptRecord,
     FallbackEvidence,
     InferenceRun,
@@ -29,6 +30,7 @@ from openrouter_demo.routing import (
     RoutingStrategy,
 )
 from openrouter_demo.scenarios import FallbackResult, run_fallback_scenario
+from openrouter_demo.telemetry import record_trace
 
 type StreamFn = Callable[..., AsyncIterator[StreamChunk | StreamedResult]]
 
@@ -252,6 +254,7 @@ async def _run_inference(
     history: RunHistory,
     stream_fn: StreamFn = stream_chat_completion,
     strategy: RoutingStrategy = DEFAULT_STRATEGY,
+    config: AppConfig | None = None,
 ) -> InferenceRun:
     prompt = prompt.strip()
     if not prompt:
@@ -266,6 +269,30 @@ async def _run_inference(
                 text_parts.append(event.text_delta)
                 continue
 
+            trace_status: str | Unavailable = UNAVAILABLE
+            trace_id: str | None = None
+            trace_url: str | None = None
+            if config is not None:
+                model_for_trace = (
+                    event.model if not isinstance(event.model, Unavailable) else strategy.model
+                )
+                usage_details: dict[str, int] = {}
+                if not isinstance(event.prompt_tokens, Unavailable):
+                    usage_details["prompt_tokens"] = event.prompt_tokens
+                if not isinstance(event.completion_tokens, Unavailable):
+                    usage_details["completion_tokens"] = event.completion_tokens
+                outcome = record_trace(
+                    config=config,
+                    name="openrouter-inference",
+                    model=model_for_trace,
+                    input={"prompt": prompt},
+                    output=event.text,
+                    usage_details=usage_details,
+                )
+                trace_status = outcome.status
+                trace_id = outcome.trace_id
+                trace_url = outcome.trace_url
+
             telemetry = TelemetryEvidence(
                 model=event.model,
                 provider=event.provider,
@@ -278,6 +305,9 @@ async def _run_inference(
                 cached_tokens=event.cached_tokens,
                 cache_write_tokens=event.cache_write_tokens,
                 openrouter_metadata=event.openrouter_metadata,
+                trace_status=trace_status,
+                trace_id=trace_id,
+                trace_url=trace_url,
             )
             run = InferenceRun(
                 run_id=uuid.uuid4().hex,
@@ -329,6 +359,7 @@ async def _run_fallback_inference(
     history: RunHistory,
     fallback_strategy: RoutingStrategy,
     stream_fn: StreamFn = stream_chat_completion,
+    config: AppConfig | None = None,
 ) -> InferenceRun:
     prompt = prompt.strip()
     if not prompt:
@@ -367,6 +398,32 @@ async def _run_fallback_inference(
         history.append(run)
         return run
 
+    trace_status: str | Unavailable = UNAVAILABLE
+    trace_id: str | None = None
+    trace_url: str | None = None
+    if config is not None:
+        model_for_trace = (
+            fallback_result.model
+            if not isinstance(fallback_result.model, Unavailable)
+            else fallback_strategy.model
+        )
+        usage_details: dict[str, int] = {}
+        if not isinstance(fallback_result.prompt_tokens, Unavailable):
+            usage_details["prompt_tokens"] = fallback_result.prompt_tokens
+        if not isinstance(fallback_result.completion_tokens, Unavailable):
+            usage_details["completion_tokens"] = fallback_result.completion_tokens
+        outcome = record_trace(
+            config=config,
+            name="openrouter-inference",
+            model=model_for_trace,
+            input={"prompt": prompt},
+            output=fallback_result.text,
+            usage_details=usage_details,
+        )
+        trace_status = outcome.status
+        trace_id = outcome.trace_id
+        trace_url = outcome.trace_url
+
     telemetry = TelemetryEvidence(
         model=fallback_result.model,
         provider=fallback_result.provider,
@@ -375,6 +432,13 @@ async def _run_fallback_inference(
         completion_tokens=fallback_result.completion_tokens,
         total_tokens=fallback_result.total_tokens,
         cost_usd=fallback_result.cost_usd,
+        cache_status=fallback_result.cache_status,
+        cached_tokens=fallback_result.cached_tokens,
+        cache_write_tokens=fallback_result.cache_write_tokens,
+        openrouter_metadata=fallback_result.openrouter_metadata,
+        trace_status=trace_status,
+        trace_id=trace_id,
+        trace_url=trace_url,
     )
     fallback_attempt_record = AttemptRecord(
         model=fallback_result.model,
@@ -484,6 +548,7 @@ def build_app(
                 history=history,
                 fallback_strategy=selected_strategy,
                 stream_fn=observed_stream,
+                config=config,
             )
         else:
             run = await _run_inference(
@@ -492,6 +557,7 @@ def build_app(
                 history=history,
                 stream_fn=observed_stream,
                 strategy=selected_strategy,
+                config=config,
             )
         state.is_running = False
         state.last_run = run

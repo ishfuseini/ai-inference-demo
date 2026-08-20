@@ -21,7 +21,15 @@ def test_phase1_has_no_database_imports() -> None:
         assert forbidden not in text
 
 
-def test_phase1_does_not_create_langfuse_traces() -> None:
-    text = implementation_text()
-    for forbidden in ("get_client(", ".trace(", ".start_span(", ".generation("):
-        assert forbidden not in text
+def test_phase1_keeps_langfuse_tracing_isolated_to_telemetry() -> None:
+    telemetry_path = Path("src/openrouter_demo/telemetry.py")
+    assert "get_client(" in telemetry_path.read_text()
+    core_modules = [
+        Path("app.py"),
+        Path("src/openrouter_demo/client.py"),
+        Path("src/openrouter_demo/models.py"),
+        Path("src/openrouter_demo/scenarios.py"),
+        Path("src/openrouter_demo/ui.py"),
+    ]
+    for path in core_modules:
+        assert "get_client(" not in path.read_text()

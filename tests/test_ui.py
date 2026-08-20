@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 from openrouter_demo.client import OpenRouterHTTPError
+from openrouter_demo.config import load_config
 from openrouter_demo.history import RunHistory
 from openrouter_demo.models import (
     UNAVAILABLE,
@@ -466,6 +467,120 @@ def test_telemetry_rows_render_fallback_evidence() -> None:
     assert rows["Fallback model"] == "openai/gpt-4o-mini"
     assert rows["Fallback status"] == "succeeded"
     assert rows["Failure type"] == "Simulated failure triggered for demo."
+
+
+def test_run_inference_without_config_skips_tracing() -> None:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
+        yield StreamedResult(
+            text="done",
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+            latency_ms=200,
+        )
+
+    run = _run(
+        _run_inference("Prompt", api_key="sk-test", history=RunHistory(), stream_fn=fake_stream)
+    )
+    assert run.status is Status.SUCCEEDED
+    assert run.telemetry is not None
+    assert run.telemetry.trace_status is UNAVAILABLE
+    assert run.telemetry.trace_id is None
+
+
+def test_run_inference_with_langfuse_disabled_config_records_trace_status() -> None:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
+        yield StreamedResult(
+            text="done",
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+            latency_ms=200,
+        )
+
+    run = _run(
+        _run_inference(
+            "Prompt",
+            api_key="sk-test",
+            history=RunHistory(),
+            stream_fn=fake_stream,
+            config=load_config({}),
+        )
+    )
+    assert run.status is Status.SUCCEEDED
+    assert run.telemetry is not None
+    assert run.telemetry.trace_status == "disabled"
+    assert run.telemetry.trace_id is None
+
+
+def _dual_stream_for_repeat_ui_test() -> object:
+    call_count = 0
+
+    async def dual_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise OpenRouterHTTPError(
+                "OpenRouter request failed (404)", status_code=404, partial_text=""
+            )
+        yield StreamChunk("Fallback ")
+        yield StreamedResult(
+            text="Fallback response",
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+            latency_ms=200,
+        )
+
+    return dual_stream
+
+
+def test_run_fallback_inference_without_config_skips_tracing() -> None:
+    run = _run(
+        _run_fallback_inference(
+            "test",
+            api_key="sk-test",
+            history=RunHistory(),
+            fallback_strategy=DEFAULT_STRATEGY,
+            stream_fn=_dual_stream_for_repeat_ui_test(),
+        )
+    )
+    assert run.status is Status.FALLBACK_SUCCEEDED
+    assert run.telemetry is not None
+    assert run.telemetry.trace_status is UNAVAILABLE
+    assert run.telemetry.trace_id is None
+
+
+def test_run_fallback_inference_with_langfuse_disabled_config_records_trace_status() -> None:
+    run = _run(
+        _run_fallback_inference(
+            "test",
+            api_key="sk-test",
+            history=RunHistory(),
+            fallback_strategy=DEFAULT_STRATEGY,
+            stream_fn=_dual_stream_for_repeat_ui_test(),
+            config=load_config({}),
+        )
+    )
+    assert run.status is Status.FALLBACK_SUCCEEDED
+    assert run.telemetry is not None
+    assert run.telemetry.trace_status == "disabled"
+    assert run.telemetry.trace_id is None
 
 
 def test_run_fallback_inference_appends_to_history() -> None:

@@ -172,7 +172,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 06-02-PLAN.md — Guard-tests slice: DOC-04 UI-framing guard in tests/test_ui.py and DOC-05 focused-coverage guard in tests/test_docs.py.
+- [x] 06-02-PLAN.md — Guard-tests slice: DOC-04 UI-framing guard in tests/test_ui.py and DOC-05 focused-coverage guard in tests/test_docs.py.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -189,7 +189,7 @@ Plans:
 | 3. Routing and Fallback Demo | 2/2 | Complete | 2026-08-19 |
 | 4. Telemetry, Repeat, and Observability | 3/3 | Complete | 2026-08-19 |
 | 5. Deterministic Evals | 1/1 | Complete    | 2026-08-20 |
-| 6. Interview Walkthrough and Quality Gates | 1/3 | In progress | - |
+| 6. Interview Walkthrough and Quality Gates | 2/3 | In progress | - |
 
 ## Coverage
 

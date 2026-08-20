@@ -62,6 +62,37 @@ def _format_cost(value: float | Unavailable) -> str:
     return f"${value:g}"
 
 
+def _format_cache_cell(telemetry: TelemetryEvidence | None) -> str:
+    if telemetry is None:
+        return _UNAVAILABLE_COPY
+    if telemetry.cache_status == "hit":
+        return f"Cache hit ({_format_tokens(telemetry.cached_tokens)} tokens)"
+    if telemetry.cache_status == "write":
+        return f"Cache write ({_format_tokens(telemetry.cache_write_tokens)} tokens)"
+    return _UNAVAILABLE_COPY
+
+
+def _format_trace_cell(telemetry: TelemetryEvidence | None) -> str:
+    if telemetry is None:
+        return _UNAVAILABLE_COPY
+    if telemetry.trace_status == "enabled":
+        return telemetry.trace_url or telemetry.trace_id or _UNAVAILABLE_COPY
+    if telemetry.trace_status == "disabled":
+        return TRACE_DISABLED
+    return _UNAVAILABLE_COPY
+
+
+def _format_router_cell(telemetry: TelemetryEvidence | None) -> str:
+    if telemetry is None:
+        return _UNAVAILABLE_COPY
+    meta = telemetry.openrouter_metadata
+    if isinstance(meta, dict):
+        router_id = meta.get("id") or meta.get("upstream_id")
+        if isinstance(router_id, str) and router_id:
+            return router_id
+    return _UNAVAILABLE_COPY
+
+
 SAMPLE_PROMPTS = (
     "Explain eventual consistency to a backend engineer.",
     "Summarize this incident report for a customer.",
@@ -99,6 +130,9 @@ def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> li
             ("Latency", _format_latency(Unavailable())),
             ("Tokens", _format_tokens(Unavailable())),
             ("Cost", _format_cost(Unavailable())),
+            ("Router", _format_router_cell(None)),
+            ("Cache", _format_cache_cell(None)),
+            ("Trace", _format_trace_cell(None)),
         ]
     if run is None:
         return [
@@ -109,6 +143,9 @@ def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> li
             ("Latency", _format_latency(Unavailable())),
             ("Tokens", _format_tokens(Unavailable())),
             ("Cost", _format_cost(Unavailable())),
+            ("Router", _format_router_cell(None)),
+            ("Cache", _format_cache_cell(None)),
+            ("Trace", _format_trace_cell(None)),
         ]
 
     telemetry = run.telemetry
@@ -138,6 +175,9 @@ def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> li
             _format_tokens(telemetry.total_tokens) if telemetry else _format_tokens(Unavailable()),
         ),
         ("Cost", _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable())),
+        ("Router", _format_router_cell(telemetry)),
+        ("Cache", _format_cache_cell(telemetry)),
+        ("Trace", _format_trace_cell(telemetry)),
     ]
     if run.fallback_evidence is not None:
         fe = run.fallback_evidence
@@ -234,6 +274,10 @@ async def _run_inference(
                 completion_tokens=event.completion_tokens,
                 total_tokens=event.total_tokens,
                 cost_usd=event.cost_usd,
+                cache_status=event.cache_status,
+                cached_tokens=event.cached_tokens,
+                cache_write_tokens=event.cache_write_tokens,
+                openrouter_metadata=event.openrouter_metadata,
             )
             run = InferenceRun(
                 run_id=uuid.uuid4().hex,

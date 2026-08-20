@@ -169,6 +169,75 @@ def test_stream_401_raises_auth_error() -> None:
         asyncio.run(_run())
 
 
+def test_stream_sends_metadata_header_and_extracts_cache_hit() -> None:
+    chunks = [
+        {
+            "choices": [{"delta": {"content": "cached"}}],
+            "model": "openai/gpt-4o-mini",
+            "usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 5,
+                "total_tokens": 105,
+                "cost": 0.002,
+                "prompt_tokens_details": {"cached_tokens": 90, "cache_write_tokens": 0},
+            },
+        },
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers.get("x-openrouter-metadata") == "enabled"
+        return httpx.Response(200, content=_sse_bytes(chunks))
+
+    async def _run() -> StreamedResult | None:
+        result: StreamedResult | None = None
+        async for item in stream_chat_completion(
+            "hi", strategy=DEFAULT_STRATEGY, api_key="k", http_client=_client_with(handler)
+        ):
+            if isinstance(item, StreamedResult):
+                result = item
+        return result
+
+    result = asyncio.run(_run())
+    assert result is not None
+    assert result.cache_status == "hit"
+    assert result.cached_tokens == 90
+    assert result.cache_write_tokens == 0
+
+
+def test_stream_missing_cache_details_is_unavailable() -> None:
+    chunks = [
+        {
+            "choices": [{"delta": {"content": "hi"}}],
+            "model": "openai/gpt-4o-mini",
+            "usage": {
+                "prompt_tokens": 5,
+                "completion_tokens": 3,
+                "total_tokens": 8,
+                "cost": 0.001,
+            },
+        },
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=_sse_bytes(chunks))
+
+    async def _run() -> StreamedResult | None:
+        result: StreamedResult | None = None
+        async for item in stream_chat_completion(
+            "hi", strategy=DEFAULT_STRATEGY, api_key="k", http_client=_client_with(handler)
+        ):
+            if isinstance(item, StreamedResult):
+                result = item
+        return result
+
+    result = asyncio.run(_run())
+    assert result is not None
+    assert result.cache_status is UNAVAILABLE
+    assert result.cached_tokens is UNAVAILABLE
+    assert result.cache_write_tokens is UNAVAILABLE
+    assert result.openrouter_metadata is UNAVAILABLE
+
+
 def test_stream_preserves_partial_text_on_error_payload() -> None:
     chunks = [
         {"choices": [{"delta": {"content": "partial"}}]},

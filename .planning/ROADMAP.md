@@ -141,11 +141,11 @@ Plans:
   4. Eval summary supports comparison across at least two strategies or models.
   5. Langfuse trace IDs or disabled trace state are reported consistently.
 
-**Plans**: 1 plan
+**Plans**: 1/1 plans executed
 Plans:
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — Deterministic eval CLI: 5-case JSON, keyword scoring, honest telemetry, strategy/model comparison, and guard-test updates.
+- [x] 05-01-PLAN.md — Deterministic eval CLI: 5-case JSON, keyword scoring, honest telemetry, strategy/model comparison, and guard-test updates.
 
 **UI hint**: yes
 
@@ -175,7 +175,7 @@ Plans:
 | 2. Streaming Inference Evidence | 2/2 | Complete    | 2026-08-19 |
 | 3. Routing and Fallback Demo | 2/2 | Complete | 2026-08-19 |
 | 4. Telemetry, Repeat, and Observability | 3/3 | Complete | 2026-08-19 |
-| 5. Deterministic Evals | 0/0 | Not started | - |
+| 5. Deterministic Evals | 1/1 | In Progress|  |
 | 6. Interview Walkthrough and Quality Gates | 0/0 | Not started | - |
 
 ## Coverage

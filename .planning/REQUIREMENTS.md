@@ -44,12 +44,12 @@
 
 ### Evals
 
-- [ ] **EVAL-01**: Eval command or scenario runs three to five deterministic eval cases.
-- [ ] **EVAL-02**: Each eval case has a clear pass/fail rule.
-- [ ] **EVAL-03**: Eval output includes model or strategy used, pass/fail result, and score reason.
-- [ ] **EVAL-04**: Eval output includes latency and token/cost metadata when available.
-- [ ] **EVAL-05**: Eval output includes Langfuse trace IDs or disabled tracing state as appropriate.
-- [ ] **EVAL-06**: Eval summary supports comparison across at least two strategies or models.
+- [x] **EVAL-01**: Eval command or scenario runs three to five deterministic eval cases.
+- [x] **EVAL-02**: Each eval case has a clear pass/fail rule.
+- [x] **EVAL-03**: Eval output includes model or strategy used, pass/fail result, and score reason.
+- [x] **EVAL-04**: Eval output includes latency and token/cost metadata when available.
+- [x] **EVAL-05**: Eval output includes Langfuse trace IDs or disabled tracing state as appropriate.
+- [x] **EVAL-06**: Eval summary supports comparison across at least two strategies or models.
 
 ### Interview Walkthrough and Quality
 
@@ -114,12 +114,12 @@
 | OBS-05 | Phase 4 | Pending |
 | OBS-06 | Phase 4 | Pending |
 | OBS-07 | Phase 4 | Pending |
-| EVAL-01 | Phase 5 | Pending |
-| EVAL-02 | Phase 5 | Pending |
-| EVAL-03 | Phase 5 | Pending |
-| EVAL-04 | Phase 5 | Pending |
-| EVAL-05 | Phase 5 | Pending |
-| EVAL-06 | Phase 5 | Pending |
+| EVAL-01 | Phase 5 | Complete |
+| EVAL-02 | Phase 5 | Complete |
+| EVAL-03 | Phase 5 | Complete |
+| EVAL-04 | Phase 5 | Complete |
+| EVAL-05 | Phase 5 | Complete |
+| EVAL-06 | Phase 5 | Complete |
 | DOC-01 | Phase 6 | Pending |
 | DOC-02 | Phase 6 | Pending |
 | DOC-03 | Phase 6 | Pending |
@@ -130,6 +130,7 @@
 | DOC-08 | Phase 6 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 39 total
 - Mapped to phases: 39
 - Unmapped: 0

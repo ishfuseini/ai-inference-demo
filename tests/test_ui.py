@@ -728,31 +728,79 @@ def test_history_rows_render_cache_and_trace_columns() -> None:
 
 
 def test_comparison_rows_include_completed_runs() -> None:
-    run = InferenceRun(
-        run_id="run-compare",
-        prompt="Prompt",
+    def _run(model: str, status: Status, completed: bool = True) -> InferenceRun:
+        return InferenceRun(
+            run_id=f"run-{model}",
+            prompt="Prompt",
+            strategy_name=DEFAULT_STRATEGY.name,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC) if completed else None,
+            status=status,
+            streamed_text="done",
+            error_message=None,
+            telemetry=TelemetryEvidence(
+                model=model,
+                provider="OpenAI",
+                latency_ms=200,
+                prompt_tokens=3,
+                completion_tokens=4,
+                total_tokens=7,
+                cost_usd=0.001,
+            ),
+        )
+
+    history = RunHistory()
+    history.append(_run("openai/gpt-4o-mini", Status.SUCCEEDED))
+    history.append(_run("openai/gpt-4o-mini-extra", Status.SUCCEEDED))
+    history.append(_run("failed-model", Status.FAILED))
+    history.append(_run("pending-model", Status.PENDING, completed=False))
+
+    rows_all = _comparison_rows(history)
+    models_all = [row[0] for row in rows_all]
+    assert len(rows_all) >= 2
+    assert "openai/gpt-4o-mini" in models_all
+    assert "openai/gpt-4o-mini-extra" in models_all
+    assert "failed-model" not in models_all
+    assert "pending-model" not in models_all
+
+    rows_limited = _comparison_rows(history, limit=1)
+    assert len(rows_limited) == 1
+
+    # Cache/trace labels in comparison rows must match history rows.
+    cache_trace_run = InferenceRun(
+        run_id="run-compare-cache-trace",
+        prompt="Prompt cache/trace",
         strategy_name=DEFAULT_STRATEGY.name,
         started_at=datetime.now(UTC),
         completed_at=datetime.now(UTC),
         status=Status.SUCCEEDED,
-        streamed_text="done",
+        streamed_text="cache trace done",
         error_message=None,
         telemetry=TelemetryEvidence(
-            model="openai/gpt-4o-mini",
+            model="openai/gpt-4o-mini-cache-trace",
             provider="OpenAI",
-            latency_ms=200,
-            prompt_tokens=3,
-            completion_tokens=4,
-            total_tokens=7,
-            cost_usd=0.001,
+            latency_ms=250,
+            prompt_tokens=4,
+            completion_tokens=5,
+            total_tokens=9,
+            cost_usd=0.0015,
+            cache_status="hit",
+            cached_tokens=10,
+            cache_write_tokens=0,
+            trace_status="enabled",
+            trace_id="abc123",
+            trace_url="https://cloud.langfuse.com/traces/abc123",
         ),
     )
-    history = RunHistory()
-    history.append(run)
-    rows = _comparison_rows(history)
-    assert len(rows) >= 1
-    assert rows[0][0] == "openai/gpt-4o-mini"
-    assert rows[0][1] == "OpenAI"
+    cache_trace_history = RunHistory()
+    cache_trace_history.append(cache_trace_run)
+
+    history_rows = _history_rows(cache_trace_history)
+    comparison_rows = _comparison_rows(cache_trace_history)
+    assert len(history_rows) == 1
+    assert len(comparison_rows) == 1
+    assert comparison_rows[0][-2] == history_rows[0][-2] == "hit (10)"
+    assert comparison_rows[0][-1] == history_rows[0][-1] == "https://cloud.langfuse.com/traces/abc123"
 
 
 def test_run_fallback_inference_appends_to_history() -> None:

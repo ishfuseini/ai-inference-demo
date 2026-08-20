@@ -16,14 +16,17 @@ UNAVAILABLE = Unavailable()
 _UNAVAILABLE_SENTINEL = "__unavailable__"
 
 
-def _serialize_value(value: object) -> object:
+def serialize_value(value: object) -> object:
     if isinstance(value, Unavailable):
         return _UNAVAILABLE_SENTINEL
     return value
 
 
-def _deserialize_value(value: object) -> object:
+def deserialize_value(value: object) -> object:
     if value == _UNAVAILABLE_SENTINEL:
+        return UNAVAILABLE
+    # Legacy asdict shape produced by dataclasses.asdict on a pre-Phase-4 row.
+    if isinstance(value, dict) and value == {"label": "unavailable"}:
         return UNAVAILABLE
     return value
 
@@ -77,39 +80,39 @@ class TelemetryEvidence:
 
     def to_dict(self) -> dict:
         return {
-            "model": _serialize_value(self.model),
-            "provider": _serialize_value(self.provider),
+            "model": serialize_value(self.model),
+            "provider": serialize_value(self.provider),
             "latency_ms": self.latency_ms,
-            "prompt_tokens": _serialize_value(self.prompt_tokens),
-            "completion_tokens": _serialize_value(self.completion_tokens),
-            "total_tokens": _serialize_value(self.total_tokens),
-            "cost_usd": _serialize_value(self.cost_usd),
-            "cache_status": _serialize_value(self.cache_status),
-            "cached_tokens": _serialize_value(self.cached_tokens),
-            "cache_write_tokens": _serialize_value(self.cache_write_tokens),
-            "trace_status": _serialize_value(self.trace_status),
+            "prompt_tokens": serialize_value(self.prompt_tokens),
+            "completion_tokens": serialize_value(self.completion_tokens),
+            "total_tokens": serialize_value(self.total_tokens),
+            "cost_usd": serialize_value(self.cost_usd),
+            "cache_status": serialize_value(self.cache_status),
+            "cached_tokens": serialize_value(self.cached_tokens),
+            "cache_write_tokens": serialize_value(self.cache_write_tokens),
+            "trace_status": serialize_value(self.trace_status),
             "trace_id": self.trace_id,
             "trace_url": self.trace_url,
-            "openrouter_metadata": _serialize_value(self.openrouter_metadata),
+            "openrouter_metadata": serialize_value(self.openrouter_metadata),
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> "TelemetryEvidence":
         return cls(
-            model=_deserialize_value(data.get("model")),
-            provider=_deserialize_value(data.get("provider")),
+            model=deserialize_value(data.get("model")),
+            provider=deserialize_value(data.get("provider")),
             latency_ms=data.get("latency_ms"),
-            prompt_tokens=_deserialize_value(data.get("prompt_tokens")),
-            completion_tokens=_deserialize_value(data.get("completion_tokens")),
-            total_tokens=_deserialize_value(data.get("total_tokens")),
-            cost_usd=_deserialize_value(data.get("cost_usd")),
-            cache_status=_deserialize_value(data.get("cache_status")),
-            cached_tokens=_deserialize_value(data.get("cached_tokens")),
-            cache_write_tokens=_deserialize_value(data.get("cache_write_tokens")),
-            trace_status=_deserialize_value(data.get("trace_status")),
+            prompt_tokens=deserialize_value(data.get("prompt_tokens")),
+            completion_tokens=deserialize_value(data.get("completion_tokens")),
+            total_tokens=deserialize_value(data.get("total_tokens")),
+            cost_usd=deserialize_value(data.get("cost_usd")),
+            cache_status=deserialize_value(data.get("cache_status")),
+            cached_tokens=deserialize_value(data.get("cached_tokens")),
+            cache_write_tokens=deserialize_value(data.get("cache_write_tokens")),
+            trace_status=deserialize_value(data.get("trace_status")),
             trace_id=data.get("trace_id"),
             trace_url=data.get("trace_url"),
-            openrouter_metadata=_deserialize_value(data.get("openrouter_metadata")),
+            openrouter_metadata=deserialize_value(data.get("openrouter_metadata")),
         )
 
 

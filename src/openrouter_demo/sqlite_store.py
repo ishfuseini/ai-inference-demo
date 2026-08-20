@@ -6,7 +6,6 @@ from datetime import datetime
 from pathlib import Path
 
 from openrouter_demo.models import (
-    UNAVAILABLE,
     AttemptRecord,
     FallbackEvidence,
     InferenceRun,
@@ -14,15 +13,12 @@ from openrouter_demo.models import (
     Status,
     StreamedResult,
     TelemetryEvidence,
+    deserialize_value,
 )
 
 
 def _deserialize(value: object) -> object:
-    if value == "__unavailable__":
-        return UNAVAILABLE
-    if isinstance(value, dict) and value == {"label": "unavailable"}:
-        return UNAVAILABLE
-    return value
+    return deserialize_value(value)
 
 
 def _attempt_from_dict(data: dict) -> AttemptRecord:

@@ -6,7 +6,9 @@ from openrouter_demo.models import (
     AttemptRecord,
     FallbackEvidence,
     InferenceRun,
+    RepeatObservation,
     Status,
+    StreamedResult,
     TelemetryEvidence,
 )
 from openrouter_demo.routing import DEFAULT_STRATEGY
@@ -108,6 +110,73 @@ def test_round_trip_preserves_unavailable_cache_status(tmp_path) -> None:
     assert reloaded.telemetry is not None
     assert reloaded.telemetry.cache_status is UNAVAILABLE
     assert not isinstance(reloaded.telemetry.cache_status, dict)
+
+
+def test_round_trip_persists_repeat_observation(tmp_path) -> None:
+    store = SQLiteRunHistory(db_path=str(tmp_path / "runs_repeat.db"))
+    first = StreamedResult(
+        text="first",
+        model="openai/gpt-4o-mini",
+        provider="OpenAI",
+        prompt_tokens=5,
+        completion_tokens=3,
+        total_tokens=8,
+        cost_usd=0.006,
+        latency_ms=300,
+    )
+    second = StreamedResult(
+        text="second",
+        model="openai/gpt-4o-mini",
+        provider="OpenAI",
+        prompt_tokens=5,
+        completion_tokens=3,
+        total_tokens=8,
+        cost_usd=0.004,
+        latency_ms=180,
+        cache_status="hit",
+        cached_tokens=10,
+        cache_write_tokens=0,
+    )
+    run = InferenceRun(
+        run_id="run-repeat",
+        prompt="Prompt",
+        strategy_name=DEFAULT_STRATEGY.name,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        status=Status.SUCCEEDED,
+        streamed_text="second",
+        error_message=None,
+        telemetry=TelemetryEvidence(
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            latency_ms=180,
+            prompt_tokens=5,
+            completion_tokens=3,
+            total_tokens=8,
+            cost_usd=0.004,
+            cache_status="hit",
+            cached_tokens=10,
+            cache_write_tokens=0,
+        ),
+        repeat_observation=RepeatObservation(
+            first=first,
+            second=second,
+            cache_status="hit",
+            cached_tokens=10,
+            cache_write_tokens=0,
+        ),
+    )
+    store.append(run)
+
+    reloaded = store.get("run-repeat")
+    assert reloaded is not None
+    assert reloaded.repeat_observation is not None
+    assert reloaded.repeat_observation.first.latency_ms == 300
+    assert reloaded.repeat_observation.first.cost_usd == 0.006
+    assert reloaded.repeat_observation.second.latency_ms == 180
+    assert reloaded.repeat_observation.second.cost_usd == 0.004
+    assert reloaded.repeat_observation.cache_status == "hit"
+    assert reloaded.repeat_observation.cached_tokens == 10
 
 
 def test_legacy_flat_row_loads_via_compatibility_branch(tmp_path) -> None:

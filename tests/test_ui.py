@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from pathlib import Path
 
 from openrouter_demo.client import OpenRouterHTTPError
 from openrouter_demo.config import load_config
@@ -837,3 +838,26 @@ def test_run_fallback_inference_appends_to_history() -> None:
         )
     )
     assert history.all() == [run]
+
+
+def test_ui_has_no_chatbot_labels() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+    for inference_copy in (
+        'ui.page_title("OpenRouter Production Inference Lab")',
+        'ui.label("Route, observe, recover, and evaluate model calls.")',
+        'ui.label("A model call is easy. Operating inference is the real problem.")',
+        'ui.button("Run Inference", on_click=run_request)',
+        '"Streaming response"',
+        '"Telemetry"',
+        '"Run history"',
+        '"Comparison"',
+    ):
+        assert inference_copy in text
+    for forbidden in (
+        "ui.chat_message",
+        '"assistant"',
+        '"user"',
+        "Chat",
+        "Send message",
+    ):
+        assert forbidden not in text

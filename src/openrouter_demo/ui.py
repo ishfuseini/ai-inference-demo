@@ -13,6 +13,8 @@ from openrouter_demo.client import OpenRouterError, stream_chat_completion
 from openrouter_demo.config import LANGFUSE_ENV_VARS, OPENROUTER_API_KEY, AppConfig
 from openrouter_demo.history import RunHistory
 from openrouter_demo.models import (
+    AttemptRecord,
+    FallbackEvidence,
     InferenceRun,
     Status,
     StreamChunk,
@@ -20,7 +22,12 @@ from openrouter_demo.models import (
     TelemetryEvidence,
     Unavailable,
 )
-from openrouter_demo.routing import DEFAULT_STRATEGY, RoutingStrategy
+from openrouter_demo.routing import (
+    DEFAULT_STRATEGY,
+    ROUTING_STRATEGY_LABELS,
+    STRATEGIES,
+    RoutingStrategy,
+)
 
 type StreamFn = Callable[..., AsyncIterator[StreamChunk | StreamedResult]]
 
@@ -64,6 +71,7 @@ EMPTY_RESPONSE = "Run an inference request to see streaming output."
 STREAMING_RESPONSE = "Streaming from OpenRouter..."
 SUCCESS_RESPONSE = "Request completed successfully."
 FAILURE_RESPONSE = "Request failed before fallback could complete."
+FALLBACK_SUCCESS_RESPONSE = "Completed via fallback route after primary route failed."
 TRACE_DISABLED = "Langfuse tracing disabled. Configure Langfuse credentials to enable trace links."
 
 
@@ -99,7 +107,12 @@ def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> li
         ]
 
     telemetry = run.telemetry
-    status = SUCCESS_RESPONSE if run.status is Status.SUCCEEDED else FAILURE_RESPONSE
+    if run.status is Status.FALLBACK_SUCCEEDED:
+        status = FALLBACK_SUCCESS_RESPONSE
+    elif run.status is Status.SUCCEEDED:
+        status = SUCCESS_RESPONSE
+    else:
+        status = FAILURE_RESPONSE
     return [
         ("Status", status),
         ("Strategy", strategy),
@@ -117,10 +130,13 @@ def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> li
     ]
 
 
-def _history_rows(history: RunHistory) -> list[tuple[str, str, str, str, str, str, str]]:
-    rows: list[tuple[str, str, str, str, str, str, str]] = []
+def _history_rows(
+    history: RunHistory,
+) -> list[tuple[str, str, str, str, str, str, str, str]]:
+    rows: list[tuple[str, str, str, str, str, str, str, str]] = []
     for index, run in enumerate(history.all(), start=1):
         telemetry = run.telemetry
+        fallback_label = "Yes" if run.fallback_evidence is not None else "—"
         rows.append(
             (
                 str(index),
@@ -130,6 +146,7 @@ def _history_rows(history: RunHistory) -> list[tuple[str, str, str, str, str, st
                 _format_latency(telemetry.latency_ms) if telemetry else _format_latency(Unavailable()),
                 _format_tokens(telemetry.total_tokens) if telemetry else _format_tokens(Unavailable()),
                 _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable()),
+                fallback_label,
             )
         )
     return rows
@@ -153,7 +170,7 @@ def _render_history(history: RunHistory) -> None:
                 "text-sm text-gray-600"
             )
             return
-        columns = ("Run", "Strategy", "Model", "Provider", "Latency", "Tokens", "Cost")
+        columns = ("Run", "Strategy", "Model", "Provider", "Latency", "Tokens", "Cost", "Fallback")
         with ui.grid(columns=len(columns)).classes("w-full gap-2 text-sm"):
             for column in columns:
                 ui.label(column).classes("font-semibold")
@@ -310,14 +327,17 @@ def build_app(
             api_key=os.environ.get(OPENROUTER_API_KEY, ""),
             history=history,
             stream_fn=observed_stream,
-            strategy=DEFAULT_STRATEGY,
+            strategy=STRATEGIES.get(strategy_select.value, DEFAULT_STRATEGY),
         )
         state.is_running = False
         state.last_run = run
         state.response = run.streamed_text
-        state.response_status = (
-            SUCCESS_RESPONSE if run.status is Status.SUCCEEDED else FAILURE_RESPONSE
-        )
+        if run.status is Status.FALLBACK_SUCCEEDED:
+            state.response_status = FALLBACK_SUCCESS_RESPONSE
+        elif run.status is Status.SUCCEEDED:
+            state.response_status = SUCCESS_RESPONSE
+        else:
+            state.response_status = FAILURE_RESPONSE
         sync_run_button()
         refresh(response_panel)
         refresh(telemetry_panel)
@@ -367,8 +387,20 @@ def build_app(
                     ui.button(sample, on_click=lambda sample=sample: fill_prompt(sample)).props(
                         "flat dense"
                     )
-            ui.label("Default").classes("font-semibold")
-            ui.label(DEFAULT_STRATEGY.description).classes("text-sm text-gray-600")
+            ui.label("Strategy").classes("font-semibold")
+            strategy_select = ui.select(
+                options={s.name: ROUTING_STRATEGY_LABELS[s.name] for s in STRATEGIES.values()},
+                value=DEFAULT_STRATEGY.name,
+            ).classes("w-full")
+            strategy_description_label = ui.label(DEFAULT_STRATEGY.description).classes(
+                "text-sm text-gray-600"
+            )
+
+            def update_strategy_description(_: object) -> None:
+                selected = STRATEGIES.get(strategy_select.value, DEFAULT_STRATEGY)
+                strategy_description_label.text = selected.description
+
+            strategy_select.on("update:model-value", update_strategy_description)
             run_button = ui.button("Run Inference", on_click=run_request)
             run_button.props("disable")
 

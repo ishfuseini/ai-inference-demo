@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 current_phase: 6
 current_phase_name: Interview Walkthrough and Quality Gates
-status: executing
-stopped_at: Plan 06-02 complete, ready to execute 06-03
-last_updated: "2026-08-20T17:02:00Z"
-state_head: 7caf80e03beccee018f6e44ec009355c47766cf7
+status: complete
+stopped_at: Phase 6 complete, ready for /gsd:verify-work
+last_updated: "2026-08-20T17:08:00Z"
+state_head: edfcff6d0282d11342ff56a82462b49332086600
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
 milestone_name: milestone
 ---
 
@@ -22,14 +22,14 @@ milestone_name: milestone
 See: `.planning/PROJECT.md` (updated 2026-08-19)
 
 **Core value:** Make production inference behavior visible and defensible in a five-minute interview demo.
-**Current focus:** Phase 5 — Deterministic Evals
+**Current focus:** Phase 6 — Interview Walkthrough and Quality Gates
 
 ## Current Position
 
-**Phase:** 6 (Interview Walkthrough and Quality Gates) — EXECUTING
-**Plan:** 06-02 complete; 06-03 next
-**Status:** Executing
-**Next:** 06-03 (Quality-gate confirmation)
+**Phase:** 6 (Interview Walkthrough and Quality Gates) — COMPLETE
+**Plan:** 06-03 complete
+**Status:** Complete
+**Next:** /gsd:verify-work 6 (live walkthrough UAT; DOC-08 live check deferred here)
 
 ```text
 Progress: [##########] 100%
@@ -39,10 +39,10 @@ Progress: [##########] 100%
 
 | Metric | Current |
 |--------|---------|
-| Phases complete | 4/6 |
+| Phases complete | 5/6 |
 | Requirements mapped | 39/39 |
 | Requirements complete | 25/39 |
-| Plans complete | 10 |
+| Plans complete | 14 |
 
 ## Accumulated Context
 
@@ -67,7 +67,7 @@ Progress: [##########] 100%
 
 ### Todos
 
-- Verify Phase 5 evals (run `/gsd:verify-work 5`) after the live eval check.
+- Run `/gsd:verify-work 6` for the live walkthrough UAT (includes the DOC-08 live NiceGUI launch check).
 
 ### Blockers
 
@@ -75,11 +75,11 @@ Progress: [##########] 100%
 
 ## Session Continuity
 
-**Last session:** 2026-08-19
-**Stopped at:** Phase 5 complete, ready to plan Phase 6
+**Last session:** 2026-08-20
+**Stopped at:** Phase 6 complete, ready for /gsd:verify-work
 **Resume file:** .planning/ROADMAP.md
 
-Phase 4 added normalized telemetry (cache/trace/router fields on `TelemetryEvidence`/`StreamedResult`), the `X-OpenRouter-Metadata` opt-in header, a pure `_extract_cache` predicate, conditional Langfuse tracing (`record_trace`/`TraceOutcome`), a repeat/cache scenario (`run_repeat_scenario`/`RepeatObservation`) with a Repeat UI action, and a fixed SQLite round-trip plus 10-column history comparison. Phase 5 can add deterministic evals on top.
+Phase 6 rewrote README.md to the full demo story, promoted docs/architecture.md, moved the failure tree to docs/failure-tree.md with UI copy reconciled to literal ui.py constants, fixed the quickstart eval command, and added docs/UI drift guards (tests/test_docs.py, tests/test_ui.py). Quality gates are green: 105 tests pass and ruff is clean.
 
 ---
-*Last updated: 2026-08-19 after Phase 4 execution*
+*Last updated: 2026-08-20 after Phase 6 execution*

@@ -11,7 +11,7 @@
 - [x] **Phase 3: Routing and Fallback Demo** - User can compare routing strategies and inspect reproducible fallback behavior.
 - [x] **Phase 4: Telemetry, Repeat, and Observability** - User can compare runs with honest metadata, repeat/cache observations, and optional Langfuse traces.
 - [x] **Phase 5: Deterministic Evals** - User can run small evals and compare model/strategy quality with telemetry evidence. (completed 2026-08-20)
-- [ ] **Phase 6: Interview Walkthrough and Quality Gates** - Reviewer can follow docs and trust focused tests/lint checks.
+- [x] **Phase 6: Interview Walkthrough and Quality Gates** - Reviewer can follow docs and trust focused tests/lint checks. (completed 2026-08-20)
 
 ## Phase Details
 
@@ -176,7 +176,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 06-03-PLAN.md — Quality-gate confirmation: uv run pytest (DOC-06), uv run ruff check . (DOC-07), and single-credential demo confirmation (DOC-08).
+- [x] 06-03-PLAN.md — Quality-gate confirmation: uv run pytest (DOC-06), uv run ruff check . (DOC-07), and single-credential demo confirmation (DOC-08).
 
 **UI hint**: yes
 
@@ -189,7 +189,7 @@ Plans:
 | 3. Routing and Fallback Demo | 2/2 | Complete | 2026-08-19 |
 | 4. Telemetry, Repeat, and Observability | 3/3 | Complete | 2026-08-19 |
 | 5. Deterministic Evals | 1/1 | Complete    | 2026-08-20 |
-| 6. Interview Walkthrough and Quality Gates | 2/3 | In progress | - |
+| 6. Interview Walkthrough and Quality Gates | 3/3 | Complete    | 2026-08-20 |
 
 ## Coverage
 

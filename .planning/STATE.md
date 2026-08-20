@@ -1,48 +1,46 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-current_phase: 6
-current_phase_name: Interview Walkthrough and Quality Gates
-status: complete
+status: Awaiting next milestone
 stopped_at: Phase 6 UAT complete (9/9 passed), milestone v1.0 ready for archive
-last_updated: "2026-08-20T17:45:00Z"
-state_head: 417535b
+last_updated: "2026-08-20T17:32:13.154Z"
+last_activity: 2026-08-20
+last_activity_desc: Milestone v1.0 completed and archived
+state_head: f7c463c00707b04b4c4798f6ce30e972d591d2c1
 progress:
   total_phases: 6
   completed_phases: 6
   total_plans: 15
-  completed_plans: 15
+  completed_plans: 14
 milestone_name: milestone
+current_phase: 6
+current_phase_name: Interview Walkthrough and Quality Gates
 ---
 
 # Project State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-08-19)
+See: `.planning/PROJECT.md` (updated 2026-08-20 after v1.0 milestone)
 
 **Core value:** Make production inference behavior visible and defensible in a five-minute interview demo.
-**Current focus:** Phase 6 — Interview Walkthrough and Quality Gates
+**Current focus:** v1.0 MVP shipped — awaiting next milestone planning
 
 ## Current Position
 
-**Phase:** 6 (Interview Walkthrough and Quality Gates) — COMPLETE + UAT PASSED
-**Plan:** All 06 plans complete
-**Status:** Complete
-**Next:** /gsd:complete-milestone (milestone v1.0 ready for archive)
-
-```text
-Progress: [##########] 100%
-```
+Phase: Milestone v1.0 complete (all 6 phases verified)
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-20 — Milestone v1.0 completed and archived
 
 ## Performance Metrics
 
 | Metric | Current |
 |--------|---------|
-| Phases complete | 5/6 |
+| Phases complete | 6/6 |
 | Requirements mapped | 39/39 |
-| Requirements complete | 25/39 |
-| Plans complete | 14 |
+| Requirements complete | 39/39 |
+| Plans complete | 15 |
 
 ## Accumulated Context
 
@@ -67,7 +65,7 @@ Progress: [##########] 100%
 
 ### Todos
 
-- Run `/gsd:verify-work 6` for the live walkthrough UAT (includes the DOC-08 live NiceGUI launch check).
+(None — milestone complete)
 
 ### Blockers
 
@@ -82,4 +80,8 @@ Progress: [##########] 100%
 Phase 6 rewrote README.md to the full demo story, promoted docs/architecture.md, moved the failure tree to docs/failure-tree.md with UI copy reconciled to literal ui.py constants, fixed the quickstart eval command, and added docs/UI drift guards (tests/test_docs.py, tests/test_ui.py). Quality gates are green: 105 tests pass and ruff is clean.
 
 ---
-*Last updated: 2026-08-20 after Phase 6 execution*
+*Last updated: 2026-08-20 after v1.0 milestone archival*
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

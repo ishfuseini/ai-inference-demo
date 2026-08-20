@@ -14,16 +14,19 @@ Make production inference behavior visible and defensible in a five-minute inter
 
 ### Validated
 
-- [x] Reviewer can install and run the local demo with `uv`. Validated in Phase 01: Runnable Skeleton and Config.
-- [x] Candidate can run a real streaming OpenRouter request from a NiceGUI interface. Validated in Phase 02: Streaming Inference Evidence.
+- [x] Reviewer can install and run the local demo with `uv`. Validated in Phase 01: Runnable Skeleton and Config. — v1.0
+- [x] Candidate can run a real streaming OpenRouter request from a NiceGUI interface. Validated in Phase 02: Streaming Inference Evidence. — v1.0
+- [x] Candidate can compare routing strategies using visible model, provider, latency, token, cost, fallback, and trace evidence. Validated in Phase 03: Routing and Fallback Demo. — v1.0
+- [x] Candidate can trigger a reproducible fallback path that preserves the failed primary attempt and the recovery attempt. Validated in Phase 03: Routing and Fallback Demo. — v1.0
+- [x] Candidate can report cache/repeat behavior honestly, without claiming cache hits unless metadata supports it. Validated in Phase 04: Telemetry, Repeat, and Observability. — v1.0
+- [x] Candidate can run a small deterministic eval set across strategy/model choices. Validated in Phase 05: Deterministic Evals. — v1.0
+- [x] Reviewer can inspect concise docs, failure tree, and focused tests during a technical walkthrough. Validated in Phase 06: Interview Walkthrough and Quality Gates. — v1.0
 
 ### Active
 
-- [ ] Candidate can compare routing strategies using visible model, provider, latency, token, cost, fallback, and trace evidence.
-- [ ] Candidate can trigger a reproducible fallback path that preserves the failed primary attempt and the recovery attempt.
-- [ ] Candidate can report cache/repeat behavior honestly, without claiming cache hits unless metadata supports it.
-- [ ] Candidate can run a small deterministic eval set across strategy/model choices.
-- [ ] Reviewer can inspect concise docs, failure tree, and focused tests during a technical walkthrough.
+(None — all v1 requirements validated)
+
+### Validated — v1.0
 
 ### Out of Scope
 
@@ -36,14 +39,16 @@ Make production inference behavior visible and defensible in a five-minute inter
 
 ## Context
 
-Seed context is already present in `docs/` and `data/`. The main product source is `docs/PRD.md`, supported by UX specs, acceptance criteria, a data model, quickstart, failure tree, and design references.
+Shipped v1.0 with 2,188 LOC Python source and 2,664 LOC tests across 104 commits over 3 days. Tech stack: Python 3.12+, NiceGUI, httpx, Langfuse Python SDK, uv, Ruff, pytest. All 39 requirements validated, 105 tests pass, ruff clean.
+
+Seed context remains in `docs/` and `data/`. The main product source is `docs/PRD.md`, supported by UX specs, acceptance criteria, a data model, quickstart, failure tree, and design references.
 
 The demo is aimed at two people:
 
 - The interviewer, who needs to understand the artifact in about 30 seconds, see the core behavior in about five minutes, and inspect the implementation during a 15-minute discussion.
 - The candidate, who needs a compact, honest proof that they can debug and reason about real inference routing, fallback, caching, cost, latency, evals, and observability.
 
-The intended implementation is a single Python package with a thin `app.py` entrypoint, NiceGUI UI code, a direct OpenRouter client, routing/scenario definitions, telemetry normalization, deterministic eval scoring, and focused tests.
+The implemented product is a single Python package (`src/openrouter_demo/`) with a thin `app.py` entrypoint, NiceGUI UI code, a direct OpenRouter client, routing/scenario definitions, telemetry normalization, SQLite persistence, deterministic eval scoring, and 11 test modules.
 
 ## Constraints
 
@@ -59,12 +64,12 @@ The intended implementation is a single Python package with a thin `app.py` entr
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Use existing `docs/` and `data/` as seed material | The repo already contains PRD, UX, acceptance, research, and data artifacts for this exact demo | - Pending |
-| Use Vertical MVP roadmap mode | Each phase should produce an interview-demonstrable capability, not isolated layers that only work at the end | - Pending |
-| Use direct OpenRouter HTTP calls | Keeps request bodies, streaming, provider routing, fallback, and metadata inspectable | - Pending |
-| Use NiceGUI for the UI | Preserves a Python-first repo while giving the interviewer visible runtime evidence | - Pending |
-| Keep Langfuse optional | Core demo must run with only `OPENROUTER_API_KEY` | - Pending |
-| Use uv, Ruff, and pytest | Matches seed docs and provides a simple quality gate path | - Pending |
+| Use existing `docs/` and `data/` as seed material | The repo already contains PRD, UX, acceptance, research, and data artifacts for this exact demo | ✓ Good — seed docs grounded every phase; no rework needed |
+| Use Vertical MVP roadmap mode | Each phase should produce an interview-demonstrable capability, not isolated layers that only work at the end | ✓ Good — every phase shipped a demoable slice; no "big bang" risk |
+| Use direct OpenRouter HTTP calls | Keeps request bodies, streaming, provider routing, fallback, and metadata inspectable | ✓ Good — all OpenRouter-specific fields visible in UI and telemetry |
+| Use NiceGUI for the UI | Preserves a Python-first repo while giving the interviewer visible runtime evidence | ✓ Good — streaming, telemetry, history, and comparison all rendered in one local app |
+| Keep Langfuse optional | Core demo must run with only `OPENROUTER_API_KEY` | ✓ Good — `config.langfuse_ready` gate works; tracing never blocks inference |
+| Use uv, Ruff, and pytest | Matches seed docs and provides a simple quality gate path | ✓ Good — 105 tests pass, ruff clean, single-command setup |
 
 ## Evolution
 
@@ -84,4 +89,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state.
 
 ---
-*Last updated: 2026-08-19 after Phase 01 verification*
+*Last updated: 2026-08-20 after v1.0 milestone*

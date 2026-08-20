@@ -307,7 +307,7 @@ async def _run_fallback_inference(
             primary_record = event.primary
             fallback_result = event.fallback
 
-    if fallback_result is None:
+    if fallback_result is None or primary_record is None:
         # Edge case: primary unexpectedly succeeded — treat as normal run
         run = InferenceRun(
             run_id=uuid.uuid4().hex,

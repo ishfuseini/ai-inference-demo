@@ -152,6 +152,7 @@ body {
   line-height: 1.05;
   letter-spacing: -0.02em;
   color: var(--color-ink);
+    padding-top: var(--space-3);
   padding-bottom: var(--space-3);
   border-bottom: 3px solid var(--color-rule-strong);
   margin: 0;
@@ -707,8 +708,8 @@ def _heading(text: str, *, level: int, classes: str) -> None:
 
 
 SAMPLE_PROMPTS = (
-    "Summarize this incident report for a customer.",
-    "Classify this support ticket by severity.",
+    "Summarize this customer support message. --- The service is back now, so I am not asking for an immediate fix. But we lost access for nearly two hours, and your support team never acknowledged the issue. I need a written explanation of what happened and how you’ll prevent it from happening again.",
+    "Classify this support ticket by severity. -- The security issue appears to have been contained, so I’m not asking you to take emergency action on our account. However, we received no timely notification and had to learn about the incident through another channel. I need a written summary of what happened, what information may have been affected, and what protections are now in place.",
 )
 
 EMPTY_RESPONSE = "Run an inference request to see streaming output."
@@ -1309,7 +1310,7 @@ def build_app(
     *,
     stream_fn: StreamFn = stream_chat_completion,
 ) -> None:
-    ui.page_title("OpenRouter Production Inference Lab")
+    ui.page_title("ishlab Production Inference Lab")
     state = _UIState()
 
     # Mount static assets for avatar and logo
@@ -1439,8 +1440,8 @@ def build_app(
                 _heading("Production Inference Lab", level=1, classes="demo-page-title")
             ui.label("ishlab").classes("demo-brand-label")
 
-        ui.label("Route, observe, recover, and evaluate model calls.").classes("demo-supporting")
-        ui.label("A model call is easy. Operating inference is the real problem.").classes(
+        ui.label("The app runs live streaming inference, exposes routing/fallback/cost/latency/cache-or-repeat evidence runs to Langfuse, and runs a three-to-five-case deterministic eval set. ").classes("demo-supporting")
+        ui.label("This demo shows what changes when inference becomes something you have to operate in production: routing, fallback, latency, cost, traces, and evals.").classes(
             "demo-supporting"
         )
 
@@ -1462,14 +1463,6 @@ def build_app(
                 if not config.langfuse_ready
                 else "Optional tracing credentials are present; values are not displayed.",
             )
-
-        # Setup guidance (only when not ready)
-        if not config.openrouter_ready:
-            with ui.card().classes("w-full demo-setup-banner"):
-                _heading("Setup needed", level=2, classes="demo-component-heading")
-                ui.label(f"Set {OPENROUTER_API_KEY} in your shell, then restart the app.").classes(
-                    "demo-body"
-                )
 
         # Request panel with section dividers
         with ui.card().classes("w-full demo-card"):

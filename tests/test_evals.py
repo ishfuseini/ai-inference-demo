@@ -230,8 +230,9 @@ def test_run_eval_set_compares_two_strategies(monkeypatch) -> None:
     assert len(summary.by_strategy()) == 2
 
 
-def test_main_missing_api_key_exits_nonzero(monkeypatch) -> None:
+def test_main_missing_api_key_exits_nonzero(monkeypatch, tmp_path) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.chdir(tmp_path)
     assert main([]) == 1
 
 
@@ -405,14 +406,15 @@ def test_evals_has_module_entry_point() -> None:
     assert "sys.exit(main())" in source
 
 
-def test_python_m_evals_exits_1_without_api_key() -> None:
+def test_python_m_evals_exits_1_without_api_key(tmp_path) -> None:
     env = {k: v for k, v in os.environ.items() if k != "OPENROUTER_API_KEY"}
-    env["PYTHONPATH"] = "src"
+    env["PYTHONPATH"] = str(Path.cwd() / "src")
     result = subprocess.run(
         [sys.executable, "-m", "openrouter_demo.evals"],
         capture_output=True,
         text=True,
         env=env,
+        cwd=tmp_path,
         check=False,
     )
     assert result.returncode == 1

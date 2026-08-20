@@ -76,7 +76,7 @@ Expected outcome:
 2. Run the eval command:
 
 ```sh
-uv run python -m openrouter_demo.evals
+PYTHONPATH=src uv run python -m openrouter_demo.evals
 ```
 
 Expected outcome:

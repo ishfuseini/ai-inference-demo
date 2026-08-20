@@ -98,16 +98,10 @@ src/openrouter_demo/client.py
 .env.example
 ```
 
-User-facing copy:
+User-facing copy (literal — auth and rate-limit failures surface as the generic failure state):
 
 ```text
-Authentication failed. Check OPENROUTER_API_KEY in your environment.
-```
-
-or:
-
-```text
-OpenRouter returned a rate limit response. Wait briefly, lower request volume, or switch route if appropriate.
+Request failed before fallback could complete.
 ```
 
 Next action:
@@ -138,10 +132,10 @@ Common signs:
 - no fallback attempt shown
 - same failure repeats across strategies
 
-User-facing copy:
+User-facing copy (literal):
 
 ```text
-Selected model or provider was unavailable. Check routing constraints or use fallback.
+Request failed before fallback could complete.
 ```
 
 Next action:
@@ -172,10 +166,10 @@ Common signs:
 - fallback route succeeds
 - high latency but successful completion
 
-User-facing copy:
+User-facing copy (literal):
 
 ```text
-Primary route timed out. Fallback route will be attempted if configured.
+Completed via fallback route after primary route failed.
 ```
 
 Next action:
@@ -201,13 +195,13 @@ src/openrouter_demo/telemetry.py
 src/openrouter_demo/ui.py
 ```
 
-Good fallback state:
+Good fallback state (literal):
 
 ```text
-Primary route failed. Fallback route completed successfully.
+Completed via fallback route after primary route failed.
 ```
 
-Bad fallback state:
+Bad fallback state (literal — a generic success that hides the fallback):
 
 ```text
 Request completed successfully.
@@ -253,6 +247,8 @@ Cost metadata was not returned for this route/provider.
 ```text
 No cache metadata returned. Showing observed repeat behavior only.
 ```
+
+(illustrative example — not a literal UI string)
 
 Next action:
 

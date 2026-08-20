@@ -1,6 +1,10 @@
 import asyncio
 import json
+import os
+import subprocess
+import sys
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import pytest
 
@@ -393,3 +397,23 @@ def test_main_json_only_stdout(monkeypatch, capsys) -> None:
     assert "cases" in doc
     assert "strategies" in doc
     assert captured.err == ""
+
+
+def test_evals_has_module_entry_point() -> None:
+    source = Path("src/openrouter_demo/evals.py").read_text()
+    assert 'if __name__ == "__main__":' in source
+    assert "sys.exit(main())" in source
+
+
+def test_python_m_evals_exits_1_without_api_key() -> None:
+    env = {k: v for k, v in os.environ.items() if k != "OPENROUTER_API_KEY"}
+    env["PYTHONPATH"] = "src"
+    result = subprocess.run(
+        [sys.executable, "-m", "openrouter_demo.evals"],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert "OPENROUTER_API_KEY" in result.stderr

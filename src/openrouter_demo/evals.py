@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from openrouter_demo.client import OpenRouterError, stream_chat_completion
 from openrouter_demo.config import AppConfig, load_config
 from openrouter_demo.models import (
-    UNAVAILABLE,
     StreamChunk,
     StreamedResult,
     TelemetryEvidence,
@@ -217,13 +216,13 @@ def _fmt_cost(value: float | Unavailable | None) -> str:
     return f"${value:g}"
 
 
-def _fmt_num(value: int | float | Unavailable | None) -> str:
+def _fmt_num(value: float | Unavailable | None) -> str:
     if isinstance(value, Unavailable) or value is None:
         return "unavailable"
     return f"{value:g}"
 
 
-def _fmt_latency(value: int | float | Unavailable | None) -> str:
+def _fmt_latency(value: float | Unavailable | None) -> str:
     if isinstance(value, Unavailable) or value is None:
         return "unavailable"
     return f"{value:g} ms"

@@ -5,8 +5,11 @@ import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, cast
 
+from fastapi.staticfiles import StaticFiles
+from nicegui import app as ng_app
 from nicegui import ui
 
 from openrouter_demo.client import OpenRouterError, stream_chat_completion
@@ -41,42 +44,58 @@ _COST_UNAVAILABLE_COPY = "Cost metadata was not returned for this route/provider
 _LATENCY_UNAVAILABLE_COPY = "Latency was not returned for this route/provider."
 
 
-# --- Design system (docs/design/DESIGN.md) ---
+# --- Design system (docs/design/DESIGN.md — Swiss/Grid) ---
 
 _DESIGN_CSS = """
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!--
+DIRECTION CONTRACT (docs/design/DESIGN.md)
+THESIS: An inference operating surface set in the Swiss/Grid tradition — structure is
+the message. The category-default dashboard of tinted cards and pill buttons is refused;
+everything sits on a visible black rule system over paper white.
+OWN-WORLD: Near-black #111111 on off-white #F7F7F5, one violet accent #8A2BE2,
+Helvetica Neue at every size, 4/8/16px radii, 1/2/4rem spacing steps, hairline
+#D8D7D2 rules, uppercase tracked micro-labels, tabular data on white panels.
+STORY: The interviewer reads the lab like a typeset instrument: route, observe,
+recover, evaluate — every piece of evidence aligned to the same grid.
+FIRST VIEWPORT: Black status bar over the page; page title 40px tight on the left;
+a single violet Run Inference button anchors the prompt card; telemetry is a ruled
+label/value table, data in tabular mono.
+FORM: Swiss Modernism grid (1950s International Typographic Style) applied to an
+Operate surface; pinned by docs/design/DESIGN.md, no concept round.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish
+review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+-->
 <style>
 :root {
-  /* Core palette */
-  --color-hero: #1f96db;
-  --color-accent: #ed7c3a;
-  --color-accent-secondary: #ab80f3;
-  --color-neutral-light: #dedbf1;
-  --color-neutral-lightest: #FCFDFE;
-  --color-neutral-dark: #525252;
-  --color-neutral-darkest: #2a3139;
+  /* Core palette — Swiss/Grid */
+  --color-ink: #111111;
+  --color-ink-secondary: #555555;
+  --color-paper: #F7F7F5;
+  --color-accent: #8A2BE2;
+  --color-accent-hover: #6E21B8;
+  --color-accent-subtle: #F1E9FB;
+  --color-rule: #D8D7D2;
+  --color-rule-strong: #111111;
 
   /* Semantic mapping */
-  --color-primary: var(--color-hero);
-  --color-primary-hover: #1a82be;
-  --color-primary-subtle: #e8f4fb;
-  --color-text-main: var(--color-neutral-darkest);
-  --color-text-secondary: var(--color-neutral-dark);
-  --color-surface: var(--color-neutral-lightest);
-  --color-surface-alt: var(--color-neutral-light);
-  --color-background: var(--color-neutral-light);
+  --color-primary: var(--color-accent);
+  --color-primary-hover: var(--color-accent-hover);
+  --color-primary-subtle: var(--color-accent-subtle);
+  --color-text-main: var(--color-ink);
+  --color-text-secondary: var(--color-ink-secondary);
+  --color-surface: #FFFFFF;
+  --color-surface-alt: var(--color-paper);
+  --color-background: var(--color-paper);
   --color-text-on-primary: #FFFFFF;
-  --color-border: var(--color-neutral-light);
+  --color-border: var(--color-rule);
   --color-success: #15803D;
-  --color-success-bg: #E8F5E9;
-  --color-warning: var(--color-accent);
-  --color-warning-bg: #FDF0E6;
+  --color-success-bg: #EAF4EC;
+  --color-warning: #B45309;
+  --color-warning-bg: #FBF3E4;
   --color-error: #B91C1C;
-  --color-error-bg: #FEE2E2;
+  --color-error-bg: #FBEAEA;
 
-  /* Spacing */
+  /* Spacing — DESIGN.md steps: sm 1rem, md 2rem, lg 4rem */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -86,135 +105,186 @@ _DESIGN_CSS = """
   --space-12: 3rem;
   --space-16: 4rem;
 
-  /* Geometry — sharp corners */
-  --radius: 0px;
+  /* Geometry — DESIGN.md radii: sm 4, md 8, lg 16 */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius: var(--radius-md);
 
-  /* Typography */
-  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  /* Typography — Helvetica Neue, the brief's only face */
+  --font-ui: 'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+
+  /* Type ramp — one size per role.
+     Roles below body are separated by whole steps, not 1px. */
+  --text-page-title: 2.5rem;   /* 40px: page title (DESIGN.md h1) */
+  --text-section: 1.25rem;     /* 20px: section headings */
+  --text-body: 1rem;           /* 16px: body copy, prose, component headings, primary buttons */
+  --text-label: 0.875rem;      /* 14px: labels, tabs, secondary buttons, muted copy */
+  --text-detail: 0.8125rem;    /* 13px: help text, status lines, data values */
+  --text-micro: 0.75rem;       /* 12px: uppercase micro-headers, status detail */
 
   /* Quasar override */
-  --q-primary: var(--color-hero);
+  --q-primary: var(--color-accent);
 }
 
 body {
   font-family: var(--font-ui);
+  font-size: var(--text-body);
+  line-height: 1.5;
   color: var(--color-text-main);
   background-color: var(--color-background);
-  --q-primary: var(--color-hero) !important;
-  --q-positive: #15803D !important;
-  --q-negative: #B91C1C !important;
-  --q-warning: var(--color-accent) !important;
+  -webkit-font-smoothing: antialiased;
+  --q-primary: var(--color-accent) !important;
+  --q-positive: var(--color-success) !important;
+  --q-negative: var(--color-error) !important;
+  --q-warning: var(--color-warning) !important;
 }
 
-/* --- Typography --- */
+/* --- Typography — Helvetica Neue, one size per role, weight/case carry sub-roles --- */
 
 .demo-page-title {
   font-family: var(--font-ui);
   font-weight: 700;
-  font-size: 1.875rem;
-  letter-spacing: -0.03em;
-  color: var(--color-text-main);
+  font-size: var(--text-page-title);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+  padding-bottom: var(--space-3);
+  border-bottom: 3px solid var(--color-rule-strong);
+}
+
+.demo-brand-label {
+  font-weight: 600;
+  font-size: var(--text-label);
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ink-secondary);
+  margin-top: var(--space-2);
+}
+
+.demo-title-with-logo {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
 }
 
 .demo-subtitle {
-  font-weight: 400;
-  font-size: 1rem;
-  color: var(--color-text-secondary);
+  font-weight: 500;
+  font-size: var(--text-body);
+  line-height: 1.5;
+  color: var(--color-ink);
+  margin-top: var(--space-3);
 }
 
 .demo-supporting {
   font-weight: 400;
-  font-size: 0.875rem;
+  font-size: var(--text-label);
+  line-height: 1.5;
   color: var(--color-text-secondary);
 }
 
 .demo-section-heading {
   font-weight: 700;
-  font-size: 1.125rem;
-  color: var(--color-text-main);
+  font-size: var(--text-section);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
 }
 
 .demo-component-heading {
-  font-weight: 600;
-  font-size: 0.9375rem;
-  color: var(--color-text-main);
+  font-weight: 700;
+  font-size: var(--text-label);
+  line-height: 1.4;
+  color: var(--color-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.demo-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
 .demo-label {
   font-weight: 500;
-  font-size: 0.875rem;
+  font-size: var(--text-label);
+  line-height: 1.4;
   color: var(--color-text-main);
 }
 
 .demo-body {
   font-weight: 400;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
+  line-height: 1.5;
   color: var(--color-text-main);
 }
 
-.demo-secondary {
-  font-weight: 400;
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-}
-
-/* --- Cards — sharp, flat, bordered --- */
+/* --- Cards — white panels on paper, hairline rules, no shadow --- */
 
 .q-card.demo-card {
   background-color: var(--color-surface) !important;
   border-radius: var(--radius) !important;
   border: 1px solid var(--color-border) !important;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06) !important;
+  box-shadow: none !important;
+  padding: var(--space-6) !important;
 }
 
-/* Setup banner */
+/* Setup banner — warning on paper, strong black rule instead of color edge */
 .q-card.demo-setup-banner {
   background-color: var(--color-warning-bg) !important;
   border-radius: var(--radius) !important;
-  border: 1px solid var(--color-warning) !important;
-  border-left: 3px solid var(--color-warning) !important;
+  border: 1px solid var(--color-rule) !important;
   box-shadow: none !important;
+  padding: var(--space-4) var(--space-6) !important;
 }
 
-/* --- Buttons — accent orange, sharp corners --- */
+/* --- Buttons --- */
 
+/* Primary — violet block, sharp Swiss radius */
 .q-btn.demo-btn-primary,
 .q-btn.demo-btn-primary.bg-primary,
 .bg-primary.demo-btn-primary {
   background: var(--color-accent) !important;
-  color: #FFFFFF !important;
+  color: var(--color-text-on-primary) !important;
   font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 0.9375rem;
-  border-radius: var(--radius) !important;
-  padding: var(--space-2) var(--space-6);
+  font-weight: 700;
+  font-size: var(--text-body);
+  line-height: 1.4;
+  border-radius: var(--radius-sm) !important;
+  padding: var(--space-2) var(--space-8);
   transition: background-color 0.15s ease-out;
   box-shadow: none !important;
   text-transform: none !important;
 }
 .q-btn.demo-btn-primary:hover:not(.disabled) {
-  background-color: #d46a2e !important;
+  background-color: var(--color-accent-hover) !important;
 }
 .q-btn.demo-btn-primary.disabled {
-  background-color: var(--color-border) !important;
+  background-color: var(--color-rule) !important;
   color: var(--color-text-secondary) !important;
   opacity: 1 !important;
 }
 
-/* Secondary button — ghost with border */
+/* Secondary button — black outline, paper fill on hover */
 .q-btn.demo-btn-secondary {
   font-family: var(--font-ui);
   font-weight: 500;
-  font-size: 0.8125rem;
-  color: var(--color-hero) !important;
+  font-size: var(--text-label);
+  line-height: 1.4;
+  color: var(--color-ink) !important;
   background-color: transparent !important;
-  border: 1px solid var(--color-border) !important;
-  border-radius: var(--radius) !important;
+  border: 1px solid var(--color-ink) !important;
+  border-radius: var(--radius-sm) !important;
   text-transform: none !important;
+  transition: background-color 0.15s ease-out;
 }
 .q-btn.demo-btn-secondary:hover {
-  border-color: var(--color-hero) !important;
+  background-color: var(--color-surface-alt) !important;
 }
 
 /* --- Telemetry table — full width, bordered, no stripe --- */
@@ -243,7 +313,7 @@ body {
 
 .demo-telemetry-label {
   font-weight: 500;
-  font-size: 0.75rem;
+  font-size: var(--text-micro);
   color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -253,7 +323,7 @@ body {
 .demo-telemetry-value {
   font-family: var(--font-mono);
   font-weight: 400;
-  font-size: 0.8125rem;
+  font-size: var(--text-detail);
   color: var(--color-text-main);
   text-align: right;
   max-width: 65%;
@@ -272,11 +342,11 @@ body {
 }
 
 .demo-grid-header {
-  font-weight: 600;
-  font-size: 0.75rem;
+  font-weight: 500;
+  font-size: var(--text-micro);
   color: var(--color-text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   padding: var(--space-2) var(--space-3);
   border-bottom: 2px solid var(--color-border);
   white-space: nowrap;
@@ -285,7 +355,7 @@ body {
 .demo-grid-cell {
   font-family: var(--font-mono);
   font-weight: 400;
-  font-size: 0.75rem;
+  font-size: var(--text-detail);
   color: var(--color-text-main);
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--color-border);
@@ -295,54 +365,73 @@ body {
   max-width: 180px;
 }
 
+.demo-cell-tooltip {
+  font-family: var(--font-mono);
+  font-size: var(--text-detail);
+  background-color: var(--color-text-main);
+  color: var(--color-surface);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-2);
+  max-width: 320px;
+  word-break: break-all;
+}
+
 /* --- Toggle / strategy --- */
 
 .demo-toggle-help {
   font-weight: 400;
-  font-size: 0.75rem;
+  font-size: var(--text-detail);
+  line-height: 1.5;
   color: var(--color-text-secondary);
   margin-top: 2px;
 }
 
 .demo-strategy-desc {
   font-weight: 400;
-  font-size: 0.8125rem;
+  font-size: var(--text-detail);
+  line-height: 1.5;
   color: var(--color-text-secondary);
-  font-style: italic;
+}
+
+.demo-toggle-row .q-checkbox__label {
+  font-weight: 500;
+  font-size: var(--text-label);
+  line-height: 1.4;
 }
 
 /* --- Response panel --- */
 
 .demo-response-text {
   font-weight: 400;
-  font-size: 0.9375rem;
+  font-size: var(--text-body);
   color: var(--color-text-main);
   line-height: 1.6;
+  max-width: 68ch;
   white-space: pre-wrap;
 }
 
 .demo-response-status {
   font-weight: 500;
-  font-size: 0.8125rem;
+  font-size: var(--text-detail);
   color: var(--color-text-secondary);
   margin-bottom: var(--space-2);
 }
 
 .demo-response-status--success { color: var(--color-success); }
 .demo-response-status--error { color: var(--color-error); }
-.demo-response-status--streaming { color: var(--color-hero); }
+.demo-response-status--streaming { color: var(--color-accent); }
 .demo-response-status--fallback { color: var(--color-warning); }
 
-/* --- Status bar --- */
+/* --- Status bar — black instrument strip --- */
 
 .demo-status-bar {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
-  padding: var(--space-2) var(--space-4);
-  background-color: var(--color-surface);
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border);
+  gap: var(--space-8);
+  padding: var(--space-3) var(--space-6);
+  background-color: var(--color-ink);
+  border-radius: var(--radius-sm);
+  border: none;
 }
 
 .demo-status-item {
@@ -358,18 +447,19 @@ body {
   flex-shrink: 0;
 }
 
-.demo-status-dot--ready { background-color: var(--color-success); }
-.demo-status-dot--warning { background-color: var(--color-warning); }
+.demo-status-dot--ready { background-color: #4ADE80; }
+.demo-status-dot--warning { background-color: #FBBF24; }
 
 .demo-status-item-label {
   font-weight: 500;
-  font-size: 0.8125rem;
-  color: var(--color-text-main);
+  font-size: var(--text-detail);
+  color: #FFFFFF;
 }
 
 .demo-status-item-detail {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
+  font-weight: 400;
+  font-size: var(--text-micro);
+  color: rgba(255, 255, 255, 0.62);
 }
 
 /* --- Section divider --- */
@@ -385,7 +475,7 @@ body {
 .demo-tabs .q-tab {
   font-family: var(--font-ui);
   font-weight: 500;
-  font-size: 0.875rem;
+  font-size: var(--text-label);
   text-transform: none;
   color: var(--color-text-secondary);
   padding: var(--space-2) var(--space-4);
@@ -393,11 +483,11 @@ body {
 }
 
 .demo-tabs .q-tab--active {
-  color: var(--color-hero);
+  color: var(--color-ink);
 }
 
 .demo-tabs .q-tab__indicator {
-  background-color: var(--color-accent);
+  background-color: var(--color-ink);
   height: 2px;
 }
 
@@ -715,7 +805,7 @@ def _render_history(history: RunHistory) -> None:
         if not rows:
             ui.label(
                 "Previous runs will appear here for cost, latency, and route comparison."
-            ).classes("demo-secondary")
+            ).classes("demo-supporting")
             return
         columns = ("Run", "Strategy", "Model", "Provider", "Latency", "Tokens", "Cost", "Fallback", "Cache", "Trace")
         with ui.element("div").classes("demo-grid-scroll"), ui.grid(columns=len(columns)).classes("w-full"):
@@ -723,7 +813,8 @@ def _render_history(history: RunHistory) -> None:
                     ui.label(column).classes("demo-grid-header")
                 for row in rows:
                     for value in row:
-                        ui.label(value).classes("demo-grid-cell")
+                        with ui.label(value).classes("demo-grid-cell"):
+                            ui.tooltip(value)
 
         comparison = _comparison_rows(history)
         if comparison:
@@ -734,7 +825,8 @@ def _render_history(history: RunHistory) -> None:
                         ui.label(column).classes("demo-grid-header")
                     for row in comparison:
                         for value in row:
-                            ui.label(value).classes("demo-grid-cell")
+                            with ui.label(value).classes("demo-grid-cell"):
+                                ui.tooltip(value)
 
 
 async def _run_inference(
@@ -1092,6 +1184,11 @@ def build_app(
     ui.page_title("OpenRouter Production Inference Lab")
     state = _UIState()
 
+    # Mount static assets for avatar and logo
+    assets_dir = Path(__file__).parent.parent.parent / "assets"
+    if assets_dir.exists():
+        ng_app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
     def sync_run_button() -> None:
         disabled = (
             not config.openrouter_ready or state.is_running or not str(prompt.value or "").strip()
@@ -1202,9 +1299,14 @@ def build_app(
     with ui.column().classes("mx-auto w-full max-w-[1280px] gap-6 p-6"):
         ui.add_head_html(_DESIGN_CSS)
 
-        # Header
-        ui.label("OpenRouter Production Inference Lab").classes("demo-page-title")
-        ui.label("Route, observe, recover, and evaluate model calls.").classes("demo-subtitle")
+        # Header: avatar inline-left of big title, brand label below rule
+        with ui.column().classes("gap-0 w-full"):
+            with ui.row().classes("items-center gap-4"):
+                ui.image("/assets/ish-avatar.png").classes("demo-avatar")
+                ui.label("Production Inference Lab").classes("demo-page-title")
+            ui.label("ishlab").classes("demo-brand-label")
+
+        ui.label("Route, observe, recover, and evaluate model calls.").classes("demo-supporting")
         ui.label("A model call is easy. Operating inference is the real problem.").classes(
             "demo-supporting"
         )
@@ -1267,7 +1369,7 @@ def build_app(
 
             ui.element("div").classes("demo-section-divider")
 
-            with ui.row().classes("w-full gap-8 items-center"):
+            with ui.row().classes("w-full gap-8 items-center demo-toggle-row"):
                 with ui.column().classes("gap-1"):
                     repeat_enabled = ui.switch("Repeat previous prompt", value=False)
                     ui.label(
@@ -1287,7 +1389,7 @@ def build_app(
         response_panel()
 
         # Tabbed evidence: Telemetry + Run History
-        with ui.tabs().classes("w-full demo-tabs") as tabs:
+        with ui.tabs().props("align=left").classes("w-full demo-tabs") as tabs:
             ui.tab("Telemetry")
             ui.tab("Run History")
         with ui.tab_panels(tabs, value="Telemetry").classes("w-full"):

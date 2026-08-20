@@ -134,6 +134,15 @@ class FallbackEvidence:
 
 
 @dataclass(frozen=True)
+class RepeatObservation:
+    first: StreamedResult
+    second: StreamedResult
+    cache_status: str | Unavailable
+    cached_tokens: int | Unavailable
+    cache_write_tokens: int | Unavailable
+
+
+@dataclass(frozen=True)
 class InferenceRun:
     run_id: str
     prompt: str

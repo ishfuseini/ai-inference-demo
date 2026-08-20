@@ -10,7 +10,7 @@ state_head: f7c463c00707b04b4c4798f6ce30e972d591d2c1
 progress:
   total_phases: 6
   completed_phases: 6
-  total_plans: 15
+  total_plans: 14
   completed_plans: 14
 milestone_name: milestone
 current_phase: 6
@@ -40,7 +40,7 @@ Last activity: 2026-08-20 — Milestone v1.0 completed and archived
 | Phases complete | 6/6 |
 | Requirements mapped | 39/39 |
 | Requirements complete | 39/39 |
-| Plans complete | 15 |
+| Plans complete | 14 |
 
 ## Accumulated Context
 

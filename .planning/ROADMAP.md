@@ -168,7 +168,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 06-01-PLAN.md — Docs slice: create docs/architecture.md, rewrite README.md, move failure tree to docs/failure-tree.md, fix quickstart, and pin with tests/test_docs.py.
+- [x] 06-01-PLAN.md — Docs slice: create docs/architecture.md, rewrite README.md, move failure tree to docs/failure-tree.md, fix quickstart, and pin with tests/test_docs.py.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -189,7 +189,7 @@ Plans:
 | 3. Routing and Fallback Demo | 2/2 | Complete | 2026-08-19 |
 | 4. Telemetry, Repeat, and Observability | 3/3 | Complete | 2026-08-19 |
 | 5. Deterministic Evals | 1/1 | Complete    | 2026-08-20 |
-| 6. Interview Walkthrough and Quality Gates | 0/3 | Not started | - |
+| 6. Interview Walkthrough and Quality Gates | 1/3 | In progress | - |
 
 ## Coverage
 

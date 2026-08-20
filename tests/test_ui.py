@@ -31,7 +31,9 @@ def _run(coro):
 
 
 def test_run_inference_records_successful_stream() -> None:
-    async def fake_stream(*_args: object, **_kwargs: object) -> AsyncIterator[StreamChunk | StreamedResult]:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
         yield StreamChunk("Hello ")
         yield StreamChunk("there")
         yield StreamedResult(
@@ -46,7 +48,11 @@ def test_run_inference_records_successful_stream() -> None:
         )
 
     history = RunHistory()
-    run = _run(_run_inference("Explain streaming", api_key="sk-test", history=history, stream_fn=fake_stream))
+    run = _run(
+        _run_inference(
+            "Explain streaming", api_key="sk-test", history=history, stream_fn=fake_stream
+        )
+    )
 
     assert run.status is Status.SUCCEEDED
     assert run.streamed_text == "Hello there"
@@ -59,7 +65,9 @@ def test_run_inference_records_successful_stream() -> None:
 
 
 def test_run_inference_preserves_unavailable_metadata() -> None:
-    async def fake_stream(*_args: object, **_kwargs: object) -> AsyncIterator[StreamChunk | StreamedResult]:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
         yield StreamedResult(
             text="done",
             model=UNAVAILABLE,
@@ -71,7 +79,9 @@ def test_run_inference_preserves_unavailable_metadata() -> None:
             latency_ms=12,
         )
 
-    run = _run(_run_inference("Prompt", api_key="sk-test", history=RunHistory(), stream_fn=fake_stream))
+    run = _run(
+        _run_inference("Prompt", api_key="sk-test", history=RunHistory(), stream_fn=fake_stream)
+    )
 
     assert run.telemetry is not None
     assert run.telemetry.model is UNAVAILABLE
@@ -83,7 +93,9 @@ def test_run_inference_preserves_unavailable_metadata() -> None:
 
 
 def test_run_inference_records_partial_text_on_stream_failure() -> None:
-    async def fake_stream(*_args: object, **_kwargs: object) -> AsyncIterator[StreamChunk | StreamedResult]:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
         yield StreamChunk("partial")
         raise OpenRouterHTTPError("provider failed", status_code=500, partial_text="partial")
 
@@ -98,7 +110,9 @@ def test_run_inference_records_partial_text_on_stream_failure() -> None:
 
 
 def test_run_inference_rejects_blank_prompt() -> None:
-    async def fake_stream(*_args: object, **_kwargs: object) -> AsyncIterator[StreamChunk | StreamedResult]:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
         raise AssertionError("blank prompts must not start a request")
 
     try:
@@ -176,7 +190,9 @@ def test_telemetry_rows_streaming_state_copy() -> None:
 
 
 def test_run_inference_records_cost_strategy_name() -> None:
-    async def fake_stream(*_args: object, **_kwargs: object) -> AsyncIterator[StreamChunk | StreamedResult]:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
         yield StreamedResult(
             text="done",
             model="openai/gpt-4o-mini",
@@ -190,14 +206,20 @@ def test_run_inference_records_cost_strategy_name() -> None:
 
     run = _run(
         _run_inference(
-            "Prompt", api_key="sk-test", history=RunHistory(), stream_fn=fake_stream, strategy=COST_STRATEGY
+            "Prompt",
+            api_key="sk-test",
+            history=RunHistory(),
+            stream_fn=fake_stream,
+            strategy=COST_STRATEGY,
         )
     )
     assert run.strategy_name == "cost"
 
 
 def test_run_inference_records_latency_strategy_name() -> None:
-    async def fake_stream(*_args: object, **_kwargs: object) -> AsyncIterator[StreamChunk | StreamedResult]:
+    async def fake_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
         yield StreamedResult(
             text="done",
             model="openai/gpt-4o-mini",
@@ -211,7 +233,11 @@ def test_run_inference_records_latency_strategy_name() -> None:
 
     run = _run(
         _run_inference(
-            "Prompt", api_key="sk-test", history=RunHistory(), stream_fn=fake_stream, strategy=LATENCY_STRATEGY
+            "Prompt",
+            api_key="sk-test",
+            history=RunHistory(),
+            stream_fn=fake_stream,
+            strategy=LATENCY_STRATEGY,
         )
     )
     assert run.strategy_name == "latency"

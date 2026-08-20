@@ -13,8 +13,6 @@ from openrouter_demo.client import OpenRouterError, stream_chat_completion
 from openrouter_demo.config import LANGFUSE_ENV_VARS, OPENROUTER_API_KEY, AppConfig
 from openrouter_demo.history import RunHistory
 from openrouter_demo.models import (
-    AttemptRecord,
-    FallbackEvidence,
     InferenceRun,
     Status,
     StreamChunk,
@@ -60,6 +58,7 @@ def _format_cost(value: float | Unavailable) -> str:
         return _COST_UNAVAILABLE_COPY
     return f"${value:g}"
 
+
 SAMPLE_PROMPTS = (
     "Explain eventual consistency to a backend engineer.",
     "Summarize this incident report for a customer.",
@@ -84,7 +83,9 @@ class _UIState:
 
 
 def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> list[tuple[str, str]]:
-    strategy = (run.strategy_name or DEFAULT_STRATEGY.name) if run is not None else DEFAULT_STRATEGY.name
+    strategy = (
+        (run.strategy_name or DEFAULT_STRATEGY.name) if run is not None else DEFAULT_STRATEGY.name
+    )
     if is_running:
         return [
             ("Status", STREAMING_RESPONSE),
@@ -116,8 +117,14 @@ def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> li
     return [
         ("Status", status),
         ("Strategy", strategy),
-        ("Model", _format_metadata(telemetry.model) if telemetry else _format_metadata(Unavailable())),
-        ("Provider", _format_metadata(telemetry.provider) if telemetry else _format_metadata(Unavailable())),
+        (
+            "Model",
+            _format_metadata(telemetry.model) if telemetry else _format_metadata(Unavailable()),
+        ),
+        (
+            "Provider",
+            _format_metadata(telemetry.provider) if telemetry else _format_metadata(Unavailable()),
+        ),
         (
             "Latency",
             _format_latency(telemetry.latency_ms) if telemetry else _format_latency(Unavailable()),
@@ -142,9 +149,15 @@ def _history_rows(
                 str(index),
                 run.strategy_name,
                 _format_metadata(telemetry.model) if telemetry else _format_metadata(Unavailable()),
-                _format_metadata(telemetry.provider) if telemetry else _format_metadata(Unavailable()),
-                _format_latency(telemetry.latency_ms) if telemetry else _format_latency(Unavailable()),
-                _format_tokens(telemetry.total_tokens) if telemetry else _format_tokens(Unavailable()),
+                _format_metadata(telemetry.provider)
+                if telemetry
+                else _format_metadata(Unavailable()),
+                _format_latency(telemetry.latency_ms)
+                if telemetry
+                else _format_latency(Unavailable()),
+                _format_tokens(telemetry.total_tokens)
+                if telemetry
+                else _format_tokens(Unavailable()),
                 _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable()),
                 fallback_label,
             )
@@ -166,9 +179,9 @@ def _render_history(history: RunHistory) -> None:
         ui.label("Run history").classes("font-semibold")
         rows = _history_rows(history)
         if not rows:
-            ui.label("Previous runs will appear here for cost, latency, and route comparison.").classes(
-                "text-sm text-gray-600"
-            )
+            ui.label(
+                "Previous runs will appear here for cost, latency, and route comparison."
+            ).classes("text-sm text-gray-600")
             return
         columns = ("Run", "Strategy", "Model", "Provider", "Latency", "Tokens", "Cost", "Fallback")
         with ui.grid(columns=len(columns)).classes("w-full gap-2 text-sm"):
@@ -271,9 +284,7 @@ def build_app(
 
     def sync_run_button() -> None:
         disabled = (
-            not config.openrouter_ready
-            or state.is_running
-            or not str(prompt.value or "").strip()
+            not config.openrouter_ready or state.is_running or not str(prompt.value or "").strip()
         )
         if disabled:
             run_button.disable()

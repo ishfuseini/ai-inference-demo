@@ -74,11 +74,15 @@ def test_unavailable_metadata_is_not_zero() -> None:
 
 def test_trace_readiness_uses_config_without_creating_traces() -> None:
     disabled = trace_readiness_from_config(load_config({}))
-    enabled = trace_readiness_from_config(load_config({
-        LANGFUSE_PUBLIC_KEY: "pk",
-        LANGFUSE_SECRET_KEY: "sk",
-        LANGFUSE_BASE_URL: "https://cloud.langfuse.com",
-    }))
+    enabled = trace_readiness_from_config(
+        load_config(
+            {
+                LANGFUSE_PUBLIC_KEY: "pk",
+                LANGFUSE_SECRET_KEY: "sk",
+                LANGFUSE_BASE_URL: "https://cloud.langfuse.com",
+            }
+        )
+    )
     assert disabled.enabled is False
     assert enabled.enabled is True
 

@@ -20,7 +20,7 @@ from openrouter_demo.routing import (
     STRATEGIES,
 )
 from openrouter_demo.scenarios import PhaseNotImplementedError as ScenarioNotImplemented
-from openrouter_demo.scenarios import run_scenario
+from openrouter_demo.scenarios import run_fallback_scenario
 from openrouter_demo.telemetry import trace_readiness_from_config
 
 
@@ -41,8 +41,8 @@ def test_required_modules_import() -> None:
 
 
 def test_live_boundaries_raise_honest_phase_errors() -> None:
-    with pytest.raises(ScenarioNotImplemented, match="later phases"):
-        run_scenario()
+    assert callable(run_fallback_scenario)
+    assert issubclass(ScenarioNotImplemented, NotImplementedError)
     with pytest.raises(EvalsNotImplemented, match="Phase 5"):
         evals_main()
 

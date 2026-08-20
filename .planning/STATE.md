@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 3
-current_phase_name: Routing and Fallback Demo
-status: executing
+current_phase: 4
+current_phase_name: Telemetry, Repeat, and Observability
+status: planning
 stopped_at: Phase 3 complete
 last_updated: "2026-08-19T22:53:03.494Z"
 progress:
-  total_phases: 3
+  total_phases: 6
   completed_phases: 3
   total_plans: 7
   completed_plans: 7
@@ -21,13 +21,13 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-08-19)
 
 **Core value:** Make production inference behavior visible and defensible in a five-minute interview demo.
-**Current focus:** Phase 3: Routing and Fallback Demo
+**Current focus:** Phase 4: Telemetry, Repeat, and Observability
 
 ## Current Position
 
-**Phase:** 3 — Routing and Fallback Demo
-**Plan:** Complete (2/2 plans)
-**Status:** Phase complete
+**Phase:** 4 — Telemetry, Repeat, and Observability
+**Plan:** Drafted (.planning/phases/04-telemetry-repeat-observability/PLAN.md)
+**Status:** Ready to plan
 **Progress:** 100%
 
 ```text

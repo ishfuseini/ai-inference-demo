@@ -155,7 +155,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Runnable Skeleton and Config | 3/3 | Complete    | 2026-08-18 |
 | 2. Streaming Inference Evidence | 2/2 | Complete    | 2026-08-19 |
-| 3. Routing and Fallback Demo | 0/2 | Planning complete | - |
+| 3. Routing and Fallback Demo | 2/2 | Complete | 2026-08-19 |
 | 4. Telemetry, Repeat, and Observability | 0/0 | Not started | - |
 | 5. Deterministic Evals | 0/0 | Not started | - |
 | 6. Interview Walkthrough and Quality Gates | 0/0 | Not started | - |

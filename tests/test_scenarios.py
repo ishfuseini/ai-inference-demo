@@ -10,7 +10,9 @@ from openrouter_demo.scenarios import FallbackResult, run_fallback_scenario
 def _dual_stream() -> object:
     call_count = 0
 
-    async def stream(*_args: object, **_kwargs: object) -> AsyncIterator[StreamChunk | StreamedResult]:
+    async def stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
         nonlocal call_count
         call_count += 1
         if call_count == 1:

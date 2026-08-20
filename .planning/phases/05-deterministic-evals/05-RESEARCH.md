@@ -546,22 +546,25 @@ class EvalSummary:
 | A4 | The browser UI eval panel is optional for v1 (CLI satisfies EVAL-01..06); ROADMAP `UI hint: yes` may require it. | Architectural Responsibility Map | If the demo narrative needs the UI panel in the same phase, `ui.py` gains a `Run eval set` action + summary card (screen-spec §Eval summary panel). |
 | A5 | No tone score / no Langfuse scoring in v1; `record_trace` only (no `score()` call). | Patterns / Pitfalls | If the user wants Langfuse scores on eval traces now, that pulls V2-01 scope into Phase 5 — confirm before planning. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Which 5 cases are canonical?**
    - What we know: 14 cases in `data/api-complaint.csv` (6 core, 5 adversarial, 3 edge); recommended 5 = timeout-01, ratelimit-03, guarantee-07, public-08, nofailure-12.
    - What's unclear: whether the user wants a specific 3–5 subset (e.g. "just the 3 core").
    - Recommendation: default to the recommended 5; keep `--limit` to shrink at runtime.
+   - RESOLVED: the 5 canonical cases — complaint-timeout-01, complaint-ratelimit-03, adversarial-guarantee-07, adversarial-public-08, edge-nofailure-12; `--limit` shrinks at runtime.
 
 2. **`evals/cases.json` vs. direct CSV read.**
    - What we know: seed files live in `data/`; `docs/ux/plan.md` and `STACK.md` say `evals/cases.json`; `data/api-complaint-rubric.md` references a nonexistent `api_reliability_eval_cases.csv` (naming drift between the rubric and the actual `api-complaint.csv`/`api-complaint-eval.csv`).
    - What's unclear: which file is the source of truth for the planner.
    - Recommendation: check in `evals/cases.json` as the canonical eval input (translating the chosen CSV rows into keyword rules), keep the `data/*.csv`/`*.md` as read-only seed documentation.
+   - RESOLVED: `evals/cases.json` over CSV — `evals/cases.json` is the canonical eval input; `data/*.csv`/`*.md` stay read-only seed documentation.
 
 3. **Model comparison vs. strategy comparison.**
    - What we know: all three `STRATEGIES` share `model="openai/gpt-4o-mini"` (`routing.py`); they differ only in `provider_preferences`. EVAL-06 needs "at least two strategies or models".
    - What's unclear: whether the user wants a real second model in the comparison.
    - Recommendation: default `--strategies default,cost` (strategy-level, zero code change to `routing.py`); expose `--models` for optional model-level comparison via `stream_chat_completion(model=...)`.
+   - RESOLVED: default `--strategies default,cost` + optional `--models` for model-level comparison (strategy-level default, zero code change to `routing.py`).
 
 ## Environment Availability
 

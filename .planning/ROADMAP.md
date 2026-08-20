@@ -10,7 +10,7 @@
 - [x] **Phase 2: Streaming Inference Evidence** - User can run a live streaming OpenRouter request with basic telemetry.
 - [x] **Phase 3: Routing and Fallback Demo** - User can compare routing strategies and inspect reproducible fallback behavior.
 - [x] **Phase 4: Telemetry, Repeat, and Observability** - User can compare runs with honest metadata, repeat/cache observations, and optional Langfuse traces.
-- [ ] **Phase 5: Deterministic Evals** - User can run small evals and compare model/strategy quality with telemetry evidence.
+- [x] **Phase 5: Deterministic Evals** - User can run small evals and compare model/strategy quality with telemetry evidence. (completed 2026-08-20)
 - [ ] **Phase 6: Interview Walkthrough and Quality Gates** - Reviewer can follow docs and trust focused tests/lint checks.
 
 ## Phase Details
@@ -175,7 +175,7 @@ Plans:
 | 2. Streaming Inference Evidence | 2/2 | Complete    | 2026-08-19 |
 | 3. Routing and Fallback Demo | 2/2 | Complete | 2026-08-19 |
 | 4. Telemetry, Repeat, and Observability | 3/3 | Complete | 2026-08-19 |
-| 5. Deterministic Evals | 1/1 | In Progress|  |
+| 5. Deterministic Evals | 1/1 | Complete    | 2026-08-20 |
 | 6. Interview Walkthrough and Quality Gates | 0/0 | Not started | - |
 
 ## Coverage

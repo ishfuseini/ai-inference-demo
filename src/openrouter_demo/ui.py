@@ -41,6 +41,417 @@ _COST_UNAVAILABLE_COPY = "Cost metadata was not returned for this route/provider
 _LATENCY_UNAVAILABLE_COPY = "Latency was not returned for this route/provider."
 
 
+# --- Design system (docs/design/DESIGN.md) ---
+
+_DESIGN_CSS = """
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Core palette */
+  --color-hero: #1f96db;
+  --color-accent: #ed7c3a;
+  --color-accent-secondary: #ab80f3;
+  --color-neutral-light: #dedbf1;
+  --color-neutral-lightest: #FCFDFE;
+  --color-neutral-dark: #525252;
+  --color-neutral-darkest: #2a3139;
+
+  /* Semantic mapping */
+  --color-primary: var(--color-hero);
+  --color-primary-hover: #1a82be;
+  --color-primary-subtle: #e8f4fb;
+  --color-text-main: var(--color-neutral-darkest);
+  --color-text-secondary: var(--color-neutral-dark);
+  --color-surface: var(--color-neutral-lightest);
+  --color-surface-alt: var(--color-neutral-light);
+  --color-background: var(--color-neutral-light);
+  --color-text-on-primary: #FFFFFF;
+  --color-border: var(--color-neutral-light);
+  --color-success: #15803D;
+  --color-success-bg: #E8F5E9;
+  --color-warning: var(--color-accent);
+  --color-warning-bg: #FDF0E6;
+  --color-error: #B91C1C;
+  --color-error-bg: #FEE2E2;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* Geometry — sharp corners */
+  --radius: 0px;
+
+  /* Typography */
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+
+  /* Quasar override */
+  --q-primary: var(--color-hero);
+}
+
+body {
+  font-family: var(--font-ui);
+  color: var(--color-text-main);
+  background-color: var(--color-background);
+  --q-primary: var(--color-hero) !important;
+  --q-positive: #15803D !important;
+  --q-negative: #B91C1C !important;
+  --q-warning: var(--color-accent) !important;
+}
+
+/* --- Typography --- */
+
+.demo-page-title {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 1.875rem;
+  letter-spacing: -0.03em;
+  color: var(--color-text-main);
+}
+
+.demo-subtitle {
+  font-weight: 400;
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+.demo-supporting {
+  font-weight: 400;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.demo-section-heading {
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--color-text-main);
+}
+
+.demo-component-heading {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--color-text-main);
+}
+
+.demo-label {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--color-text-main);
+}
+
+.demo-body {
+  font-weight: 400;
+  font-size: 0.875rem;
+  color: var(--color-text-main);
+}
+
+.demo-secondary {
+  font-weight: 400;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+/* --- Cards — sharp, flat, bordered --- */
+
+.q-card.demo-card {
+  background-color: var(--color-surface) !important;
+  border-radius: var(--radius) !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Setup banner */
+.q-card.demo-setup-banner {
+  background-color: var(--color-warning-bg) !important;
+  border-radius: var(--radius) !important;
+  border: 1px solid var(--color-warning) !important;
+  border-left: 3px solid var(--color-warning) !important;
+  box-shadow: none !important;
+}
+
+/* --- Buttons — accent orange, sharp corners --- */
+
+.q-btn.demo-btn-primary,
+.q-btn.demo-btn-primary.bg-primary,
+.bg-primary.demo-btn-primary {
+  background: var(--color-accent) !important;
+  color: #FFFFFF !important;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  border-radius: var(--radius) !important;
+  padding: var(--space-2) var(--space-6);
+  transition: background-color 0.15s ease-out;
+  box-shadow: none !important;
+  text-transform: none !important;
+}
+.q-btn.demo-btn-primary:hover:not(.disabled) {
+  background-color: #d46a2e !important;
+}
+.q-btn.demo-btn-primary.disabled {
+  background-color: var(--color-border) !important;
+  color: var(--color-text-secondary) !important;
+  opacity: 1 !important;
+}
+
+/* Secondary button — ghost with border */
+.q-btn.demo-btn-secondary {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  color: var(--color-hero) !important;
+  background-color: transparent !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius) !important;
+  text-transform: none !important;
+}
+.q-btn.demo-btn-secondary:hover {
+  border-color: var(--color-hero) !important;
+}
+
+/* --- Telemetry table — full width, bordered, no stripe --- */
+
+.demo-telemetry-table {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.demo-telemetry-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+.demo-telemetry-row:last-child {
+  border-bottom: none;
+}
+
+.demo-telemetry-label {
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.demo-telemetry-value {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: var(--color-text-main);
+  text-align: right;
+  max-width: 65%;
+  word-break: break-word;
+}
+
+/* --- History grid --- */
+
+.demo-grid-scroll {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.demo-grid-scroll .nicegui-grid {
+  min-width: max-content;
+}
+
+.demo-grid-header {
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 2px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.demo-grid-cell {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--color-text-main);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+/* --- Toggle / strategy --- */
+
+.demo-toggle-help {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.demo-strategy-desc {
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+/* --- Response panel --- */
+
+.demo-response-text {
+  font-weight: 400;
+  font-size: 0.9375rem;
+  color: var(--color-text-main);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.demo-response-status {
+  font-weight: 500;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.demo-response-status--success { color: var(--color-success); }
+.demo-response-status--error { color: var(--color-error); }
+.demo-response-status--streaming { color: var(--color-hero); }
+.demo-response-status--fallback { color: var(--color-warning); }
+
+/* --- Status bar --- */
+
+.demo-status-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--color-surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+}
+
+.demo-status-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.demo-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.demo-status-dot--ready { background-color: var(--color-success); }
+.demo-status-dot--warning { background-color: var(--color-warning); }
+
+.demo-status-item-label {
+  font-weight: 500;
+  font-size: 0.8125rem;
+  color: var(--color-text-main);
+}
+
+.demo-status-item-detail {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+/* --- Section divider --- */
+
+.demo-section-divider {
+  height: 1px;
+  background-color: var(--color-border);
+  margin: var(--space-3) 0;
+}
+
+/* --- Tabs --- */
+
+.demo-tabs .q-tab {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 0.875rem;
+  text-transform: none;
+  color: var(--color-text-secondary);
+  padding: var(--space-2) var(--space-4);
+  min-height: 40px;
+}
+
+.demo-tabs .q-tab--active {
+  color: var(--color-hero);
+}
+
+.demo-tabs .q-tab__indicator {
+  background-color: var(--color-accent);
+  height: 2px;
+}
+
+.demo-tabs .q-tabs__bar {
+  border-bottom: 1px solid var(--color-border);
+  justify-content: flex-start;
+}
+
+/* Tab panels — transparent, no padding */
+.q-tab-panels {
+  background-color: transparent !important;
+}
+
+.q-tab-panel {
+  padding: 0 !important;
+}
+
+/* --- Browser surfaces --- */
+
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background-color: var(--color-primary-subtle);
+  color: var(--color-text-main);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+</style>
+"""
+
+
 def _format_metadata(value: str | Unavailable) -> str:
     if isinstance(value, Unavailable):
         return _UNAVAILABLE_COPY
@@ -288,41 +699,42 @@ def _comparison_rows(
 
 
 def _render_telemetry(run: InferenceRun | None, *, is_running: bool = False) -> None:
-    with ui.card().classes("w-full"):
-        ui.label("Telemetry").classes("font-semibold")
-        for label, value in _telemetry_rows(run, is_running=is_running):
-            with ui.row().classes("w-full justify-between gap-4"):
-                ui.label(label).classes("text-sm text-gray-600")
-                ui.label(value).classes("text-sm font-medium")
+    with ui.card().classes("w-full demo-card"):
+        ui.label("Telemetry").classes("demo-section-heading")
+        with ui.element("div").classes("demo-telemetry-table"):
+            for label, value in _telemetry_rows(run, is_running=is_running):
+                with ui.element("div").classes("demo-telemetry-row"):
+                    ui.label(label).classes("demo-telemetry-label")
+                    ui.label(value).classes("demo-telemetry-value")
 
 
 def _render_history(history: RunHistory) -> None:
-    with ui.card().classes("w-full"):
-        ui.label("Run history").classes("font-semibold")
+    with ui.card().classes("w-full demo-card"):
+        ui.label("Run history").classes("demo-section-heading")
         rows = _history_rows(history)
         if not rows:
             ui.label(
                 "Previous runs will appear here for cost, latency, and route comparison."
-            ).classes("text-sm text-gray-600")
+            ).classes("demo-secondary")
             return
         columns = ("Run", "Strategy", "Model", "Provider", "Latency", "Tokens", "Cost", "Fallback", "Cache", "Trace")
-        with ui.grid(columns=len(columns)).classes("w-full gap-2 text-sm"):
-            for column in columns:
-                ui.label(column).classes("font-semibold")
-            for row in rows:
-                for value in row:
-                    ui.label(value)
+        with ui.element("div").classes("demo-grid-scroll"), ui.grid(columns=len(columns)).classes("w-full"):
+                for column in columns:
+                    ui.label(column).classes("demo-grid-header")
+                for row in rows:
+                    for value in row:
+                        ui.label(value).classes("demo-grid-cell")
 
         comparison = _comparison_rows(history)
         if comparison:
-            ui.label("Comparison").classes("font-semibold")
+            ui.label("Comparison").classes("demo-component-heading")
             comparison_columns = ("Model", "Provider", "Latency", "Cost", "Cache", "Trace")
-            with ui.grid(columns=len(comparison_columns)).classes("w-full gap-2 text-sm"):
-                for column in comparison_columns:
-                    ui.label(column).classes("font-semibold")
-                for row in comparison:
-                    for value in row:
-                        ui.label(value)
+            with ui.element("div").classes("demo-grid-scroll"), ui.grid(columns=len(comparison_columns)).classes("w-full"):
+                    for column in comparison_columns:
+                        ui.label(column).classes("demo-grid-header")
+                    for row in comparison:
+                        for value in row:
+                            ui.label(value).classes("demo-grid-cell")
 
 
 async def _run_inference(
@@ -662,12 +1074,13 @@ async def _run_repeat_inference(
     return run
 
 
-def _status(label: str, ready: bool, detail: str) -> None:
-    color = "positive" if ready else "warning"
-    with ui.card().classes("w-full"):
-        ui.label(label).classes("text-lg font-semibold")
-        ui.badge("Ready" if ready else "Needs setup", color=color)
-        ui.label(detail).classes("text-sm text-gray-600")
+def _status_item(label: str, ready: bool, detail: str) -> None:
+    dot_class = "demo-status-dot--ready" if ready else "demo-status-dot--warning"
+    short_detail = "Ready" if ready else "Needs setup"
+    with ui.element("div").classes("demo-status-item"):
+        ui.element("div").classes(f"demo-status-dot {dot_class}")
+        ui.label(label).classes("demo-status-item-label")
+        ui.label(short_detail).classes("demo-status-item-detail")
 
 
 def build_app(
@@ -690,10 +1103,20 @@ def build_app(
 
     @ui.refreshable
     def response_panel() -> None:
-        with ui.card().classes("w-full"):
-            ui.label("Streaming response").classes("font-semibold")
-            ui.label(state.response_status).classes("text-sm text-gray-600")
-            ui.label(state.response or EMPTY_RESPONSE).classes("whitespace-pre-wrap")
+        with ui.card().classes("w-full demo-card"):
+            ui.label("Streaming response").classes("demo-section-heading")
+            status_class = "demo-response-status"
+            if state.is_running:
+                status_class += " demo-response-status--streaming"
+            elif state.last_run is not None:
+                if state.last_run.status is Status.FALLBACK_SUCCEEDED:
+                    status_class += " demo-response-status--fallback"
+                elif state.last_run.status is Status.SUCCEEDED:
+                    status_class += " demo-response-status--success"
+                else:
+                    status_class += " demo-response-status--error"
+            ui.label(state.response_status).classes(status_class)
+            ui.label(state.response or EMPTY_RESPONSE).classes("demo-response-text")
 
     @ui.refreshable
     def telemetry_panel() -> None:
@@ -776,22 +1199,26 @@ def build_app(
         prompt.value = value
         sync_run_button()
 
-    with ui.column().classes("mx-auto w-full max-w-5xl gap-4 p-6"):
-        ui.label("OpenRouter Production Inference Lab").classes("text-3xl font-bold")
-        ui.label("Route, observe, recover, and evaluate model calls.").classes("text-gray-600")
+    with ui.column().classes("mx-auto w-full max-w-[1280px] gap-6 p-6"):
+        ui.add_head_html(_DESIGN_CSS)
+
+        # Header
+        ui.label("OpenRouter Production Inference Lab").classes("demo-page-title")
+        ui.label("Route, observe, recover, and evaluate model calls.").classes("demo-subtitle")
         ui.label("A model call is easy. Operating inference is the real problem.").classes(
-            "text-sm text-gray-600"
+            "demo-supporting"
         )
 
-        with ui.row().classes("w-full gap-4"):
-            _status(
+        # Compact inline status bar
+        with ui.element("div").classes("demo-status-bar"):
+            _status_item(
                 "OpenRouter",
                 config.openrouter_ready,
                 "Export OPENROUTER_API_KEY before live inference."
                 if not config.openrouter_ready
                 else "Required credential is present; value is not displayed.",
             )
-            _status(
+            _status_item(
                 "Langfuse tracing",
                 config.langfuse_ready,
                 TRACE_DISABLED
@@ -799,30 +1226,37 @@ def build_app(
                 else "Optional tracing credentials are present; values are not displayed.",
             )
 
+        # Setup guidance (only when not ready)
         if not config.openrouter_ready:
-            with ui.card().classes("w-full bg-amber-50"):
-                ui.label("Setup needed").classes("font-semibold")
-                ui.label(f"Set {OPENROUTER_API_KEY} in your shell, then restart the app.")
+            with ui.card().classes("w-full demo-setup-banner"):
+                ui.label("Setup needed").classes("demo-component-heading")
+                ui.label(f"Set {OPENROUTER_API_KEY} in your shell, then restart the app.").classes(
+                    "demo-body"
+                )
 
-        with ui.card().classes("w-full"):
-            ui.label("Prompt").classes("font-semibold")
+        # Request panel with section dividers
+        with ui.card().classes("w-full demo-card"):
+            ui.label("Prompt").classes("demo-component-heading")
             prompt = ui.textarea(
                 placeholder="Ask a production-style question, classification task, or summarization task...",
                 on_change=lambda _: sync_run_button(),
             ).classes("w-full")
-            ui.label("Sample prompt").classes("text-sm font-semibold")
-            with ui.row().classes("w-full gap-2"):
+            ui.label("Sample prompt").classes("demo-label")
+            with ui.row().classes("w-full gap-2 flex-wrap"):
                 for sample in SAMPLE_PROMPTS:
                     ui.button(sample, on_click=lambda sample=sample: fill_prompt(sample)).props(
                         "flat dense"
-                    )
-            ui.label("Strategy").classes("font-semibold")
+                    ).classes("demo-btn-secondary")
+
+            ui.element("div").classes("demo-section-divider")
+
+            ui.label("Strategy").classes("demo-component-heading")
             strategy_select = ui.select(
                 options={s.name: ROUTING_STRATEGY_LABELS[s.name] for s in STRATEGIES.values()},
                 value=DEFAULT_STRATEGY.name,
             ).classes("w-full")
             strategy_description_label = ui.label(DEFAULT_STRATEGY.description).classes(
-                "text-sm text-gray-600"
+                "demo-strategy-desc"
             )
 
             def update_strategy_description(_: object) -> None:
@@ -830,19 +1264,34 @@ def build_app(
                 strategy_description_label.text = selected.description
 
             strategy_select.on("update:model-value", update_strategy_description)
-            repeat_enabled = ui.switch("Repeat previous prompt", value=False)
-            ui.label("Runs the same prompt twice and reports cache evidence or latency/cost delta.").classes(
-                "text-sm text-gray-600"
-            )
-            simulate_failure = ui.switch("Simulate primary route failure", value=False)
-            ui.label("For a reproducible demo. The UI will label this as simulated.").classes(
-                "text-sm text-gray-600"
-            )
-            run_button = ui.button("Run Inference", on_click=run_request)
+
+            ui.element("div").classes("demo-section-divider")
+
+            with ui.row().classes("w-full gap-8 items-center"):
+                with ui.column().classes("gap-1"):
+                    repeat_enabled = ui.switch("Repeat previous prompt", value=False)
+                    ui.label(
+                        "Runs the same prompt twice and reports cache evidence or latency/cost delta."
+                    ).classes("demo-toggle-help")
+                with ui.column().classes("gap-1"):
+                    simulate_failure = ui.switch("Simulate primary route failure", value=False)
+                    ui.label("For a reproducible demo. The UI will label this as simulated.").classes(
+                        "demo-toggle-help"
+                    )
+            run_button = ui.button("Run Inference", on_click=run_request).classes(
+                "demo-btn-primary"
+            ).props("unelevated").style("--q-primary: var(--color-accent);")
             run_button.props("disable")
 
-        with ui.row().classes("w-full gap-4"):
-            response_panel()
-            telemetry_panel()
+        # Response panel (full width)
+        response_panel()
 
-        history_panel()
+        # Tabbed evidence: Telemetry + Run History
+        with ui.tabs().classes("w-full demo-tabs") as tabs:
+            ui.tab("Telemetry")
+            ui.tab("Run History")
+        with ui.tab_panels(tabs, value="Telemetry").classes("w-full"):
+            with ui.tab_panel("Telemetry"):
+                telemetry_panel()
+            with ui.tab_panel("Run History"):
+                history_panel()

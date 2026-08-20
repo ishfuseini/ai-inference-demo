@@ -24,6 +24,7 @@ from openrouter_demo.ui import (
     _history_rows,
     _run_fallback_inference,
     _run_inference,
+    _run_repeat_inference,
     _telemetry_rows,
 )
 
@@ -581,6 +582,108 @@ def test_run_fallback_inference_with_langfuse_disabled_config_records_trace_stat
     assert run.telemetry is not None
     assert run.telemetry.trace_status == "disabled"
     assert run.telemetry.trace_id is None
+
+
+def test_run_repeat_inference_produces_run_with_cache_and_delta() -> None:
+    call_count = 0
+
+    async def dual_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            yield StreamedResult(
+                text="first",
+                model="openai/gpt-4o-mini",
+                provider="OpenAI",
+                prompt_tokens=3,
+                completion_tokens=4,
+                total_tokens=7,
+                cost_usd=0.006,
+                latency_ms=300,
+            )
+        else:
+            yield StreamChunk("second")
+            yield StreamedResult(
+                text="second",
+                model="openai/gpt-4o-mini",
+                provider="OpenAI",
+                prompt_tokens=3,
+                completion_tokens=4,
+                total_tokens=7,
+                cost_usd=0.004,
+                latency_ms=180,
+            )
+
+    run = _run(
+        _run_repeat_inference(
+            "test",
+            api_key="sk-test",
+            history=RunHistory(),
+            strategy=DEFAULT_STRATEGY,
+            config=load_config({}),
+            stream_fn=dual_stream,
+        )
+    )
+
+    assert run.status is Status.SUCCEEDED
+    assert run.repeat_observation is not None
+    assert run.telemetry is not None
+    assert run.telemetry.cache_status is UNAVAILABLE
+    assert "Observed repeat" in dict(_telemetry_rows(run))["Cache"]
+
+
+def test_run_repeat_inference_records_cache_hit() -> None:
+    call_count = 0
+
+    async def dual_stream(
+        *_args: object, **_kwargs: object
+    ) -> AsyncIterator[StreamChunk | StreamedResult]:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            yield StreamedResult(
+                text="first",
+                model="openai/gpt-4o-mini",
+                provider="OpenAI",
+                prompt_tokens=3,
+                completion_tokens=4,
+                total_tokens=7,
+                cost_usd=0.006,
+                latency_ms=300,
+            )
+        else:
+            yield StreamedResult(
+                text="second",
+                model="openai/gpt-4o-mini",
+                provider="OpenAI",
+                prompt_tokens=3,
+                completion_tokens=4,
+                total_tokens=7,
+                cost_usd=0.004,
+                latency_ms=180,
+                cache_status="hit",
+                cached_tokens=10,
+                cache_write_tokens=0,
+            )
+
+    run = _run(
+        _run_repeat_inference(
+            "test",
+            api_key="sk-test",
+            history=RunHistory(),
+            strategy=DEFAULT_STRATEGY,
+            config=load_config({}),
+            stream_fn=dual_stream,
+        )
+    )
+
+    assert run.status is Status.SUCCEEDED
+    assert run.repeat_observation is not None
+    assert run.telemetry is not None
+    assert run.telemetry.cache_status == "hit"
+    assert run.telemetry.cached_tokens == 10
 
 
 def test_run_fallback_inference_appends_to_history() -> None:

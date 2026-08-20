@@ -17,6 +17,7 @@ from openrouter_demo.models import (
     AttemptRecord,
     FallbackEvidence,
     InferenceRun,
+    RepeatObservation,
     Status,
     StreamChunk,
     StreamedResult,
@@ -29,7 +30,7 @@ from openrouter_demo.routing import (
     STRATEGIES,
     RoutingStrategy,
 )
-from openrouter_demo.scenarios import FallbackResult, run_fallback_scenario
+from openrouter_demo.scenarios import FallbackResult, run_fallback_scenario, run_repeat_scenario
 from openrouter_demo.telemetry import record_trace
 
 type StreamFn = Callable[..., AsyncIterator[StreamChunk | StreamedResult]]
@@ -64,13 +65,23 @@ def _format_cost(value: float | Unavailable) -> str:
     return f"${value:g}"
 
 
-def _format_cache_cell(telemetry: TelemetryEvidence | None) -> str:
+def _format_cache_cell(run: InferenceRun | None) -> str:
+    if run is None:
+        return _UNAVAILABLE_COPY
+    telemetry = run.telemetry
     if telemetry is None:
         return _UNAVAILABLE_COPY
     if telemetry.cache_status == "hit":
         return f"Cache hit ({_format_tokens(telemetry.cached_tokens)} tokens)"
     if telemetry.cache_status == "write":
         return f"Cache write ({_format_tokens(telemetry.cache_write_tokens)} tokens)"
+    repeat = run.repeat_observation
+    if repeat is not None:
+        return (
+            f"Observed repeat: {_format_latency(repeat.first.latency_ms)} → "
+            f"{_format_latency(repeat.second.latency_ms)}; "
+            f"{_format_cost(repeat.first.cost_usd)} → {_format_cost(repeat.second.cost_usd)}"
+        )
     return _UNAVAILABLE_COPY
 
 
@@ -178,7 +189,7 @@ def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> li
         ),
         ("Cost", _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable())),
         ("Router", _format_router_cell(telemetry)),
-        ("Cache", _format_cache_cell(telemetry)),
+        ("Cache", _format_cache_cell(run)),
         ("Trace", _format_trace_cell(telemetry)),
     ]
     if run.fallback_evidence is not None:
@@ -472,6 +483,118 @@ async def _run_fallback_inference(
     return run
 
 
+async def _run_repeat_inference(
+    prompt: str,
+    *,
+    api_key: str,
+    history: RunHistory,
+    strategy: RoutingStrategy,
+    config: AppConfig,
+    stream_fn: StreamFn = stream_chat_completion,
+) -> InferenceRun:
+    prompt = prompt.strip()
+    if not prompt:
+        raise ValueError("Prompt must not be blank.")
+
+    started_at = datetime.now(UTC)
+    text_parts: list[str] = []
+    repeat: RepeatObservation | None = None
+
+    try:
+        async for event in run_repeat_scenario(
+            prompt,
+            strategy=strategy,
+            api_key=api_key,
+            stream_fn=stream_fn,
+        ):
+            if isinstance(event, StreamChunk):
+                text_parts.append(event.text_delta)
+            elif isinstance(event, RepeatObservation):
+                repeat = event
+    except OpenRouterError as exc:
+        run = InferenceRun(
+            run_id=uuid.uuid4().hex,
+            prompt=prompt,
+            strategy_name=strategy.name,
+            started_at=started_at,
+            completed_at=datetime.now(UTC),
+            status=Status.FAILED,
+            streamed_text=exc.partial_text or "".join(text_parts),
+            error_message=str(exc),
+            telemetry=None,
+        )
+        history.append(run)
+        return run
+
+    if repeat is None:
+        run = InferenceRun(
+            run_id=uuid.uuid4().hex,
+            prompt=prompt,
+            strategy_name=strategy.name,
+            started_at=started_at,
+            completed_at=datetime.now(UTC),
+            status=Status.FAILED,
+            streamed_text="".join(text_parts),
+            error_message="Repeat scenario ended without a final observation.",
+            telemetry=None,
+        )
+        history.append(run)
+        return run
+
+    second = repeat.second
+    trace_status: str | Unavailable = UNAVAILABLE
+    trace_id: str | None = None
+    trace_url: str | None = None
+    model_for_trace = second.model if not isinstance(second.model, Unavailable) else strategy.model
+    usage_details: dict[str, int] = {}
+    if not isinstance(second.prompt_tokens, Unavailable):
+        usage_details["prompt_tokens"] = second.prompt_tokens
+    if not isinstance(second.completion_tokens, Unavailable):
+        usage_details["completion_tokens"] = second.completion_tokens
+    outcome = record_trace(
+        config=config,
+        name="openrouter-inference",
+        model=model_for_trace,
+        input={"prompt": prompt},
+        output=second.text,
+        usage_details=usage_details,
+    )
+    trace_status = outcome.status
+    trace_id = outcome.trace_id
+    trace_url = outcome.trace_url
+
+    telemetry = TelemetryEvidence(
+        model=second.model,
+        provider=second.provider,
+        latency_ms=second.latency_ms,
+        prompt_tokens=second.prompt_tokens,
+        completion_tokens=second.completion_tokens,
+        total_tokens=second.total_tokens,
+        cost_usd=second.cost_usd,
+        cache_status=repeat.cache_status,
+        cached_tokens=repeat.cached_tokens,
+        cache_write_tokens=repeat.cache_write_tokens,
+        openrouter_metadata=second.openrouter_metadata,
+        trace_status=trace_status,
+        trace_id=trace_id,
+        trace_url=trace_url,
+    )
+    run = InferenceRun(
+        run_id=uuid.uuid4().hex,
+        prompt=prompt,
+        strategy_name=strategy.name,
+        started_at=started_at,
+        completed_at=datetime.now(UTC),
+        status=Status.SUCCEEDED,
+        streamed_text=second.text or "".join(text_parts),
+        error_message=None,
+        telemetry=telemetry,
+        repeat_observation=repeat,
+    )
+    history.append(run)
+    return run
+
+
 def _status(label: str, ready: bool, detail: str) -> None:
     color = "positive" if ready else "warning"
     with ui.card().classes("w-full"):
@@ -541,7 +664,16 @@ def build_app(
                 yield event
 
         selected_strategy = STRATEGIES.get(strategy_select.value, DEFAULT_STRATEGY)
-        if simulate_failure.value:
+        if repeat_enabled.value:
+            run = await _run_repeat_inference(
+                prompt_text,
+                api_key=os.environ.get(OPENROUTER_API_KEY, ""),
+                history=history,
+                strategy=selected_strategy,
+                config=config,
+                stream_fn=observed_stream,
+            )
+        elif simulate_failure.value:
             run = await _run_fallback_inference(
                 prompt_text,
                 api_key=os.environ.get(OPENROUTER_API_KEY, ""),
@@ -631,6 +763,10 @@ def build_app(
                 strategy_description_label.text = selected.description
 
             strategy_select.on("update:model-value", update_strategy_description)
+            repeat_enabled = ui.switch("Repeat previous prompt", value=False)
+            ui.label("Runs the same prompt twice and reports cache evidence or latency/cost delta.").classes(
+                "text-sm text-gray-600"
+            )
             simulate_failure = ui.switch("Simulate primary route failure", value=False)
             ui.label("For a reproducible demo. The UI will label this as simulated.").classes(
                 "text-sm text-gray-600"

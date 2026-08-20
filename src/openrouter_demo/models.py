@@ -154,3 +154,4 @@ class InferenceRun:
     error_message: str | None
     telemetry: TelemetryEvidence | None
     fallback_evidence: FallbackEvidence | None = None
+    repeat_observation: RepeatObservation | None = None

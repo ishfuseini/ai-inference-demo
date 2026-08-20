@@ -19,6 +19,7 @@ from openrouter_demo.routing import COST_STRATEGY, DEFAULT_STRATEGY, LATENCY_STR
 from openrouter_demo.ui import (
     FALLBACK_SUCCESS_RESPONSE,
     STREAMING_RESPONSE,
+    _comparison_rows,
     _format_cost,
     _format_metadata,
     _history_rows,
@@ -161,6 +162,8 @@ def test_telemetry_and_history_rows_render_unavailable_copy() -> None:
         "Unavailable from selected route/provider.",
         "Cost metadata was not returned for this route/provider.",
         "—",
+        "—",
+        "—",
     )
 
 
@@ -274,7 +277,9 @@ def test_history_rows_include_fallback_column() -> None:
     history.append(run)
 
     rows = _history_rows(history)
-    assert len(rows[0]) == 8
+    assert len(rows[0]) == 10
+    assert rows[0][-3] == "—"
+    assert rows[0][-2] == "—"
     assert rows[0][-1] == "—"
 
     primary = AttemptRecord(
@@ -321,7 +326,9 @@ def test_history_rows_include_fallback_column() -> None:
     )
     history.append(fallback_run)
     rows = _history_rows(history)
-    assert rows[1][-1] == "Yes"
+    assert rows[1][-3] == "Yes"
+    assert rows[1][-2] == "—"
+    assert rows[1][-1] == "—"
 
 
 def test_telemetry_rows_fallback_success_status() -> None:
@@ -684,6 +691,68 @@ def test_run_repeat_inference_records_cache_hit() -> None:
     assert run.telemetry is not None
     assert run.telemetry.cache_status == "hit"
     assert run.telemetry.cached_tokens == 10
+
+
+def test_history_rows_render_cache_and_trace_columns() -> None:
+    run = InferenceRun(
+        run_id="run-cache-trace",
+        prompt="Prompt",
+        strategy_name=DEFAULT_STRATEGY.name,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        status=Status.SUCCEEDED,
+        streamed_text="done",
+        error_message=None,
+        telemetry=TelemetryEvidence(
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            latency_ms=200,
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+            cache_status="hit",
+            cached_tokens=10,
+            cache_write_tokens=0,
+            trace_status="enabled",
+            trace_id="abc123",
+            trace_url="https://cloud.langfuse.com/traces/abc123",
+        ),
+    )
+    history = RunHistory()
+    history.append(run)
+    rows = _history_rows(history)
+    assert len(rows[0]) == 10
+    assert rows[0][-2] == "hit (10)"
+    assert rows[0][-1] == "https://cloud.langfuse.com/traces/abc123"
+
+
+def test_comparison_rows_include_completed_runs() -> None:
+    run = InferenceRun(
+        run_id="run-compare",
+        prompt="Prompt",
+        strategy_name=DEFAULT_STRATEGY.name,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        status=Status.SUCCEEDED,
+        streamed_text="done",
+        error_message=None,
+        telemetry=TelemetryEvidence(
+            model="openai/gpt-4o-mini",
+            provider="OpenAI",
+            latency_ms=200,
+            prompt_tokens=3,
+            completion_tokens=4,
+            total_tokens=7,
+            cost_usd=0.001,
+        ),
+    )
+    history = RunHistory()
+    history.append(run)
+    rows = _comparison_rows(history)
+    assert len(rows) >= 1
+    assert rows[0][0] == "openai/gpt-4o-mini"
+    assert rows[0][1] == "OpenAI"
 
 
 def test_run_fallback_inference_appends_to_history() -> None:

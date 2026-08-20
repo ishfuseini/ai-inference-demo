@@ -10,7 +10,7 @@ from typing import Any, cast
 from nicegui import ui
 
 from openrouter_demo.client import OpenRouterError, stream_chat_completion
-from openrouter_demo.config import LANGFUSE_ENV_VARS, OPENROUTER_API_KEY, AppConfig
+from openrouter_demo.config import OPENROUTER_API_KEY, AppConfig
 from openrouter_demo.history import RunHistory
 from openrouter_demo.models import (
     UNAVAILABLE,
@@ -203,10 +203,36 @@ def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> li
     return rows
 
 
+def _history_cache_label(run: InferenceRun) -> str:
+    telemetry = run.telemetry
+    if telemetry is None:
+        return "—"
+    if telemetry.cache_status == "hit":
+        return f"hit ({_format_tokens(telemetry.cached_tokens)})"
+    if telemetry.cache_status == "write":
+        return f"write ({_format_tokens(telemetry.cache_write_tokens)})"
+    if run.repeat_observation is not None:
+        return "Observed repeat"
+    return "—"
+
+
+def _history_trace_label(run: InferenceRun) -> str:
+    telemetry = run.telemetry
+    if telemetry is None:
+        return "—"
+    if telemetry.trace_status == "enabled":
+        return telemetry.trace_url or telemetry.trace_id or "—"
+    if telemetry.trace_status == "disabled":
+        return "disabled"
+    if telemetry.trace_status == "failed":
+        return "failed"
+    return "—"
+
+
 def _history_rows(
     history: RunHistory,
-) -> list[tuple[str, str, str, str, str, str, str, str]]:
-    rows: list[tuple[str, str, str, str, str, str, str, str]] = []
+) -> list[tuple[str, str, str, str, str, str, str, str, str, str]]:
+    rows: list[tuple[str, str, str, str, str, str, str, str, str, str]] = []
     for index, run in enumerate(history.all(), start=1):
         telemetry = run.telemetry
         fallback_label = "Yes" if run.fallback_evidence is not None else "—"
@@ -226,6 +252,36 @@ def _history_rows(
                 else _format_tokens(Unavailable()),
                 _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable()),
                 fallback_label,
+                _history_cache_label(run),
+                _history_trace_label(run),
+            )
+        )
+    return rows
+
+
+def _comparison_rows(
+    history: RunHistory, limit: int = 10
+) -> list[tuple[str, str, str, str, str, str]]:
+    completed = [
+        run
+        for run in history.all()
+        if run.status in (Status.SUCCEEDED, Status.FALLBACK_SUCCEEDED)
+    ]
+    rows: list[tuple[str, str, str, str, str, str]] = []
+    for run in completed[:limit]:
+        telemetry = run.telemetry
+        rows.append(
+            (
+                _format_metadata(telemetry.model) if telemetry else _format_metadata(Unavailable()),
+                _format_metadata(telemetry.provider)
+                if telemetry
+                else _format_metadata(Unavailable()),
+                _format_latency(telemetry.latency_ms)
+                if telemetry
+                else _format_latency(Unavailable()),
+                _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable()),
+                _history_cache_label(run),
+                _history_trace_label(run),
             )
         )
     return rows
@@ -249,13 +305,24 @@ def _render_history(history: RunHistory) -> None:
                 "Previous runs will appear here for cost, latency, and route comparison."
             ).classes("text-sm text-gray-600")
             return
-        columns = ("Run", "Strategy", "Model", "Provider", "Latency", "Tokens", "Cost", "Fallback")
+        columns = ("Run", "Strategy", "Model", "Provider", "Latency", "Tokens", "Cost", "Fallback", "Cache", "Trace")
         with ui.grid(columns=len(columns)).classes("w-full gap-2 text-sm"):
             for column in columns:
                 ui.label(column).classes("font-semibold")
             for row in rows:
                 for value in row:
                     ui.label(value)
+
+        comparison = _comparison_rows(history)
+        if comparison:
+            ui.label("Comparison").classes("font-semibold")
+            comparison_columns = ("Model", "Provider", "Latency", "Cost", "Cache", "Trace")
+            with ui.grid(columns=len(comparison_columns)).classes("w-full gap-2 text-sm"):
+                for column in comparison_columns:
+                    ui.label(column).classes("font-semibold")
+                for row in comparison:
+                    for value in row:
+                        ui.label(value)
 
 
 async def _run_inference(
@@ -779,12 +846,3 @@ def build_app(
             telemetry_panel()
 
         history_panel()
-
-        with ui.card().classes("w-full"):
-            ui.label("Future operation panels").classes("font-semibold")
-            ui.label(
-                "Cache, trace links, and eval execution stay reserved for later phases."
-            ).classes("text-sm text-gray-600")
-            ui.label("Optional Langfuse variables: " + ", ".join(LANGFUSE_ENV_VARS)).classes(
-                "text-sm text-gray-600"
-            )

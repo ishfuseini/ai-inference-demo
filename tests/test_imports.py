@@ -11,8 +11,14 @@ from openrouter_demo.config import (
 )
 from openrouter_demo.evals import PhaseNotImplementedError as EvalsNotImplemented
 from openrouter_demo.evals import main as evals_main
-from openrouter_demo.models import UNAVAILABLE, Unavailable
-from openrouter_demo.routing import ROUTING_STRATEGY_LABELS
+from openrouter_demo.models import UNAVAILABLE, AttemptRecord, FallbackEvidence, Status, Unavailable
+from openrouter_demo.routing import (
+    COST_STRATEGY,
+    FALLBACK_PRIMARY_STRATEGY,
+    LATENCY_STRATEGY,
+    ROUTING_STRATEGY_LABELS,
+    STRATEGIES,
+)
 from openrouter_demo.scenarios import PhaseNotImplementedError as ScenarioNotImplemented
 from openrouter_demo.scenarios import run_scenario
 from openrouter_demo.telemetry import trace_readiness_from_config
@@ -48,6 +54,16 @@ def test_routing_labels_do_not_claim_provider_results() -> None:
         "latency": "Latency optimized",
         "custom": "Custom",
     }
+
+
+def test_phase3_types_importable() -> None:
+    assert Status.FALLBACK_SUCCEEDED == "fallback_succeeded"
+    assert AttemptRecord is not None
+    assert FallbackEvidence is not None
+    assert COST_STRATEGY.name == "cost"
+    assert LATENCY_STRATEGY.name == "latency"
+    assert FALLBACK_PRIMARY_STRATEGY.name == "custom"
+    assert set(STRATEGIES.keys()) == {"default", "cost", "latency"}
 
 
 def test_unavailable_metadata_is_not_zero() -> None:

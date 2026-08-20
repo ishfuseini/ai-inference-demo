@@ -18,6 +18,7 @@ class Status(StrEnum):
     PENDING = "pending"
     STREAMING = "streaming"
     SUCCEEDED = "succeeded"
+    FALLBACK_SUCCEEDED = "fallback_succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
 
@@ -51,6 +52,26 @@ class TelemetryEvidence:
 
 
 @dataclass(frozen=True)
+class AttemptRecord:
+    model: str | Unavailable
+    provider: str | Unavailable
+    status: Status
+    error_message: str | None
+    latency_ms: int
+    prompt_tokens: int | Unavailable
+    completion_tokens: int | Unavailable
+    total_tokens: int | Unavailable
+    cost_usd: float | Unavailable
+
+
+@dataclass(frozen=True)
+class FallbackEvidence:
+    primary: AttemptRecord
+    fallback: AttemptRecord
+    simulated: bool
+
+
+@dataclass(frozen=True)
 class InferenceRun:
     run_id: str
     prompt: str
@@ -61,3 +82,4 @@ class InferenceRun:
     streamed_text: str
     error_message: str | None
     telemetry: TelemetryEvidence | None
+    fallback_evidence: FallbackEvidence | None = None

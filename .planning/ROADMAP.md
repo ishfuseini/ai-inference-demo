@@ -9,7 +9,7 @@
 - [x] **Phase 1: Runnable Skeleton and Config** - Reviewer can install, configure, and launch the local app shell.
 - [x] **Phase 2: Streaming Inference Evidence** - User can run a live streaming OpenRouter request with basic telemetry.
 - [x] **Phase 3: Routing and Fallback Demo** - User can compare routing strategies and inspect reproducible fallback behavior.
-- [ ] **Phase 4: Telemetry, Repeat, and Observability** - User can compare runs with honest metadata, repeat/cache observations, and optional Langfuse traces.
+- [x] **Phase 4: Telemetry, Repeat, and Observability** - User can compare runs with honest metadata, repeat/cache observations, and optional Langfuse traces.
 - [ ] **Phase 5: Deterministic Evals** - User can run small evals and compare model/strategy quality with telemetry evidence.
 - [ ] **Phase 6: Interview Walkthrough and Quality Gates** - Reviewer can follow docs and trust focused tests/lint checks.
 
@@ -111,7 +111,20 @@ Plans:
   5. Langfuse traces are created when configured and tracing disabled is visible when not configured.
   6. Recent run history supports comparison from the main UI.
 
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 1**
+
+- [x] 04-01-PLAN.md — Normalized telemetry vertical slice: cache/trace fields, metadata header, conditional Langfuse.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 04-02-PLAN.md — Repeat/cache scenario slice: two-run observation with cache honesty + Repeat UI action.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 04-03-PLAN.md — Persistence round-trip + history comparison slice.
+
 **UI hint**: yes
 
 ### Phase 5: Deterministic Evals
@@ -156,7 +169,7 @@ Plans:
 | 1. Runnable Skeleton and Config | 3/3 | Complete    | 2026-08-18 |
 | 2. Streaming Inference Evidence | 2/2 | Complete    | 2026-08-19 |
 | 3. Routing and Fallback Demo | 2/2 | Complete | 2026-08-19 |
-| 4. Telemetry, Repeat, and Observability | 0/0 | Not started | - |
+| 4. Telemetry, Repeat, and Observability | 3/3 | Complete | 2026-08-19 |
 | 5. Deterministic Evals | 0/0 | Not started | - |
 | 6. Interview Walkthrough and Quality Gates | 0/0 | Not started | - |
 

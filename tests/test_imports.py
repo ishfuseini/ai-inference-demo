@@ -1,3 +1,4 @@
+import dataclasses
 import importlib
 from pathlib import Path
 
@@ -90,3 +91,25 @@ def test_trace_readiness_uses_config_without_creating_traces() -> None:
 def test_evals_directory_has_no_phase1_cases() -> None:
     assert Path("evals/.gitkeep").exists()
     assert not Path("evals/cases.json").exists()
+
+
+def test_phase4_types_and_fields_importable() -> None:
+    from openrouter_demo.models import RepeatObservation, TelemetryEvidence
+    from openrouter_demo.scenarios import run_repeat_scenario
+    from openrouter_demo.telemetry import TraceOutcome
+
+    assert RepeatObservation is not None
+    assert TraceOutcome is not None
+    assert callable(run_repeat_scenario)
+
+    field_names = {field.name for field in dataclasses.fields(TelemetryEvidence)}
+    for name in (
+        "cache_status",
+        "cached_tokens",
+        "cache_write_tokens",
+        "trace_status",
+        "trace_id",
+        "trace_url",
+        "openrouter_metadata",
+    ):
+        assert name in field_names

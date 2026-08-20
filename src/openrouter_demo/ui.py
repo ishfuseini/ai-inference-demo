@@ -10,12 +10,14 @@ from typing import Any, cast
 from nicegui import ui
 
 from openrouter_demo.client import OpenRouterError, stream_chat_completion
-from openrouter_demo.config import LANGFUSE_ENV_VARS, OPENROUTER_API_KEY, AppConfig
+from openrouter_demo.config import OPENROUTER_API_KEY, AppConfig
 from openrouter_demo.history import RunHistory
 from openrouter_demo.models import (
+    UNAVAILABLE,
     AttemptRecord,
     FallbackEvidence,
     InferenceRun,
+    RepeatObservation,
     Status,
     StreamChunk,
     StreamedResult,
@@ -28,7 +30,8 @@ from openrouter_demo.routing import (
     STRATEGIES,
     RoutingStrategy,
 )
-from openrouter_demo.scenarios import FallbackResult, run_fallback_scenario
+from openrouter_demo.scenarios import FallbackResult, run_fallback_scenario, run_repeat_scenario
+from openrouter_demo.telemetry import record_trace
 
 type StreamFn = Callable[..., AsyncIterator[StreamChunk | StreamedResult]]
 
@@ -60,6 +63,47 @@ def _format_cost(value: float | Unavailable) -> str:
     if isinstance(value, Unavailable):
         return _COST_UNAVAILABLE_COPY
     return f"${value:g}"
+
+
+def _format_cache_cell(run: InferenceRun | None) -> str:
+    if run is None:
+        return _UNAVAILABLE_COPY
+    telemetry = run.telemetry
+    if telemetry is None:
+        return _UNAVAILABLE_COPY
+    if telemetry.cache_status == "hit":
+        return f"Cache hit ({_format_tokens(telemetry.cached_tokens)} tokens)"
+    if telemetry.cache_status == "write":
+        return f"Cache write ({_format_tokens(telemetry.cache_write_tokens)} tokens)"
+    repeat = run.repeat_observation
+    if repeat is not None:
+        return (
+            f"Observed repeat: {_format_latency(repeat.first.latency_ms)} → "
+            f"{_format_latency(repeat.second.latency_ms)}; "
+            f"{_format_cost(repeat.first.cost_usd)} → {_format_cost(repeat.second.cost_usd)}"
+        )
+    return _UNAVAILABLE_COPY
+
+
+def _format_trace_cell(telemetry: TelemetryEvidence | None) -> str:
+    if telemetry is None:
+        return _UNAVAILABLE_COPY
+    if telemetry.trace_status == "enabled":
+        return telemetry.trace_url or telemetry.trace_id or _UNAVAILABLE_COPY
+    if telemetry.trace_status == "disabled":
+        return TRACE_DISABLED
+    return _UNAVAILABLE_COPY
+
+
+def _format_router_cell(telemetry: TelemetryEvidence | None) -> str:
+    if telemetry is None:
+        return _UNAVAILABLE_COPY
+    meta = telemetry.openrouter_metadata
+    if isinstance(meta, dict):
+        router_id = meta.get("id") or meta.get("upstream_id")
+        if isinstance(router_id, str) and router_id:
+            return router_id
+    return _UNAVAILABLE_COPY
 
 
 SAMPLE_PROMPTS = (
@@ -99,6 +143,9 @@ def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> li
             ("Latency", _format_latency(Unavailable())),
             ("Tokens", _format_tokens(Unavailable())),
             ("Cost", _format_cost(Unavailable())),
+            ("Router", _format_router_cell(None)),
+            ("Cache", _format_cache_cell(None)),
+            ("Trace", _format_trace_cell(None)),
         ]
     if run is None:
         return [
@@ -109,6 +156,9 @@ def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> li
             ("Latency", _format_latency(Unavailable())),
             ("Tokens", _format_tokens(Unavailable())),
             ("Cost", _format_cost(Unavailable())),
+            ("Router", _format_router_cell(None)),
+            ("Cache", _format_cache_cell(None)),
+            ("Trace", _format_trace_cell(None)),
         ]
 
     telemetry = run.telemetry
@@ -138,6 +188,9 @@ def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> li
             _format_tokens(telemetry.total_tokens) if telemetry else _format_tokens(Unavailable()),
         ),
         ("Cost", _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable())),
+        ("Router", _format_router_cell(telemetry)),
+        ("Cache", _format_cache_cell(run)),
+        ("Trace", _format_trace_cell(telemetry)),
     ]
     if run.fallback_evidence is not None:
         fe = run.fallback_evidence
@@ -150,10 +203,36 @@ def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> li
     return rows
 
 
+def _history_cache_label(run: InferenceRun) -> str:
+    telemetry = run.telemetry
+    if telemetry is None:
+        return "—"
+    if telemetry.cache_status == "hit":
+        return f"hit ({_format_tokens(telemetry.cached_tokens)})"
+    if telemetry.cache_status == "write":
+        return f"write ({_format_tokens(telemetry.cache_write_tokens)})"
+    if run.repeat_observation is not None:
+        return "Observed repeat"
+    return "—"
+
+
+def _history_trace_label(run: InferenceRun) -> str:
+    telemetry = run.telemetry
+    if telemetry is None:
+        return "—"
+    if telemetry.trace_status == "enabled":
+        return telemetry.trace_url or telemetry.trace_id or "—"
+    if telemetry.trace_status == "disabled":
+        return "disabled"
+    if telemetry.trace_status == "failed":
+        return "failed"
+    return "—"
+
+
 def _history_rows(
     history: RunHistory,
-) -> list[tuple[str, str, str, str, str, str, str, str]]:
-    rows: list[tuple[str, str, str, str, str, str, str, str]] = []
+) -> list[tuple[str, str, str, str, str, str, str, str, str, str]]:
+    rows: list[tuple[str, str, str, str, str, str, str, str, str, str]] = []
     for index, run in enumerate(history.all(), start=1):
         telemetry = run.telemetry
         fallback_label = "Yes" if run.fallback_evidence is not None else "—"
@@ -173,6 +252,36 @@ def _history_rows(
                 else _format_tokens(Unavailable()),
                 _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable()),
                 fallback_label,
+                _history_cache_label(run),
+                _history_trace_label(run),
+            )
+        )
+    return rows
+
+
+def _comparison_rows(
+    history: RunHistory, limit: int = 10
+) -> list[tuple[str, str, str, str, str, str]]:
+    completed = [
+        run
+        for run in history.all()
+        if run.status in (Status.SUCCEEDED, Status.FALLBACK_SUCCEEDED)
+    ]
+    rows: list[tuple[str, str, str, str, str, str]] = []
+    for run in completed[:limit]:
+        telemetry = run.telemetry
+        rows.append(
+            (
+                _format_metadata(telemetry.model) if telemetry else _format_metadata(Unavailable()),
+                _format_metadata(telemetry.provider)
+                if telemetry
+                else _format_metadata(Unavailable()),
+                _format_latency(telemetry.latency_ms)
+                if telemetry
+                else _format_latency(Unavailable()),
+                _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable()),
+                _history_cache_label(run),
+                _history_trace_label(run),
             )
         )
     return rows
@@ -196,13 +305,24 @@ def _render_history(history: RunHistory) -> None:
                 "Previous runs will appear here for cost, latency, and route comparison."
             ).classes("text-sm text-gray-600")
             return
-        columns = ("Run", "Strategy", "Model", "Provider", "Latency", "Tokens", "Cost", "Fallback")
+        columns = ("Run", "Strategy", "Model", "Provider", "Latency", "Tokens", "Cost", "Fallback", "Cache", "Trace")
         with ui.grid(columns=len(columns)).classes("w-full gap-2 text-sm"):
             for column in columns:
                 ui.label(column).classes("font-semibold")
             for row in rows:
                 for value in row:
                     ui.label(value)
+
+        comparison = _comparison_rows(history)
+        if comparison:
+            ui.label("Comparison").classes("font-semibold")
+            comparison_columns = ("Model", "Provider", "Latency", "Cost", "Cache", "Trace")
+            with ui.grid(columns=len(comparison_columns)).classes("w-full gap-2 text-sm"):
+                for column in comparison_columns:
+                    ui.label(column).classes("font-semibold")
+                for row in comparison:
+                    for value in row:
+                        ui.label(value)
 
 
 async def _run_inference(
@@ -212,6 +332,7 @@ async def _run_inference(
     history: RunHistory,
     stream_fn: StreamFn = stream_chat_completion,
     strategy: RoutingStrategy = DEFAULT_STRATEGY,
+    config: AppConfig | None = None,
 ) -> InferenceRun:
     prompt = prompt.strip()
     if not prompt:
@@ -226,6 +347,30 @@ async def _run_inference(
                 text_parts.append(event.text_delta)
                 continue
 
+            trace_status: str | Unavailable = UNAVAILABLE
+            trace_id: str | None = None
+            trace_url: str | None = None
+            if config is not None:
+                model_for_trace = (
+                    event.model if not isinstance(event.model, Unavailable) else strategy.model
+                )
+                usage_details: dict[str, int] = {}
+                if not isinstance(event.prompt_tokens, Unavailable):
+                    usage_details["prompt_tokens"] = event.prompt_tokens
+                if not isinstance(event.completion_tokens, Unavailable):
+                    usage_details["completion_tokens"] = event.completion_tokens
+                outcome = record_trace(
+                    config=config,
+                    name="openrouter-inference",
+                    model=model_for_trace,
+                    input={"prompt": prompt},
+                    output=event.text,
+                    usage_details=usage_details,
+                )
+                trace_status = outcome.status
+                trace_id = outcome.trace_id
+                trace_url = outcome.trace_url
+
             telemetry = TelemetryEvidence(
                 model=event.model,
                 provider=event.provider,
@@ -234,6 +379,13 @@ async def _run_inference(
                 completion_tokens=event.completion_tokens,
                 total_tokens=event.total_tokens,
                 cost_usd=event.cost_usd,
+                cache_status=event.cache_status,
+                cached_tokens=event.cached_tokens,
+                cache_write_tokens=event.cache_write_tokens,
+                openrouter_metadata=event.openrouter_metadata,
+                trace_status=trace_status,
+                trace_id=trace_id,
+                trace_url=trace_url,
             )
             run = InferenceRun(
                 run_id=uuid.uuid4().hex,
@@ -285,6 +437,7 @@ async def _run_fallback_inference(
     history: RunHistory,
     fallback_strategy: RoutingStrategy,
     stream_fn: StreamFn = stream_chat_completion,
+    config: AppConfig | None = None,
 ) -> InferenceRun:
     prompt = prompt.strip()
     if not prompt:
@@ -323,6 +476,32 @@ async def _run_fallback_inference(
         history.append(run)
         return run
 
+    trace_status: str | Unavailable = UNAVAILABLE
+    trace_id: str | None = None
+    trace_url: str | None = None
+    if config is not None:
+        model_for_trace = (
+            fallback_result.model
+            if not isinstance(fallback_result.model, Unavailable)
+            else fallback_strategy.model
+        )
+        usage_details: dict[str, int] = {}
+        if not isinstance(fallback_result.prompt_tokens, Unavailable):
+            usage_details["prompt_tokens"] = fallback_result.prompt_tokens
+        if not isinstance(fallback_result.completion_tokens, Unavailable):
+            usage_details["completion_tokens"] = fallback_result.completion_tokens
+        outcome = record_trace(
+            config=config,
+            name="openrouter-inference",
+            model=model_for_trace,
+            input={"prompt": prompt},
+            output=fallback_result.text,
+            usage_details=usage_details,
+        )
+        trace_status = outcome.status
+        trace_id = outcome.trace_id
+        trace_url = outcome.trace_url
+
     telemetry = TelemetryEvidence(
         model=fallback_result.model,
         provider=fallback_result.provider,
@@ -331,6 +510,13 @@ async def _run_fallback_inference(
         completion_tokens=fallback_result.completion_tokens,
         total_tokens=fallback_result.total_tokens,
         cost_usd=fallback_result.cost_usd,
+        cache_status=fallback_result.cache_status,
+        cached_tokens=fallback_result.cached_tokens,
+        cache_write_tokens=fallback_result.cache_write_tokens,
+        openrouter_metadata=fallback_result.openrouter_metadata,
+        trace_status=trace_status,
+        trace_id=trace_id,
+        trace_url=trace_url,
     )
     fallback_attempt_record = AttemptRecord(
         model=fallback_result.model,
@@ -359,6 +545,118 @@ async def _run_fallback_inference(
         error_message=None,
         telemetry=telemetry,
         fallback_evidence=evidence,
+    )
+    history.append(run)
+    return run
+
+
+async def _run_repeat_inference(
+    prompt: str,
+    *,
+    api_key: str,
+    history: RunHistory,
+    strategy: RoutingStrategy,
+    config: AppConfig,
+    stream_fn: StreamFn = stream_chat_completion,
+) -> InferenceRun:
+    prompt = prompt.strip()
+    if not prompt:
+        raise ValueError("Prompt must not be blank.")
+
+    started_at = datetime.now(UTC)
+    text_parts: list[str] = []
+    repeat: RepeatObservation | None = None
+
+    try:
+        async for event in run_repeat_scenario(
+            prompt,
+            strategy=strategy,
+            api_key=api_key,
+            stream_fn=stream_fn,
+        ):
+            if isinstance(event, StreamChunk):
+                text_parts.append(event.text_delta)
+            elif isinstance(event, RepeatObservation):
+                repeat = event
+    except OpenRouterError as exc:
+        run = InferenceRun(
+            run_id=uuid.uuid4().hex,
+            prompt=prompt,
+            strategy_name=strategy.name,
+            started_at=started_at,
+            completed_at=datetime.now(UTC),
+            status=Status.FAILED,
+            streamed_text=exc.partial_text or "".join(text_parts),
+            error_message=str(exc),
+            telemetry=None,
+        )
+        history.append(run)
+        return run
+
+    if repeat is None:
+        run = InferenceRun(
+            run_id=uuid.uuid4().hex,
+            prompt=prompt,
+            strategy_name=strategy.name,
+            started_at=started_at,
+            completed_at=datetime.now(UTC),
+            status=Status.FAILED,
+            streamed_text="".join(text_parts),
+            error_message="Repeat scenario ended without a final observation.",
+            telemetry=None,
+        )
+        history.append(run)
+        return run
+
+    second = repeat.second
+    trace_status: str | Unavailable = UNAVAILABLE
+    trace_id: str | None = None
+    trace_url: str | None = None
+    model_for_trace = second.model if not isinstance(second.model, Unavailable) else strategy.model
+    usage_details: dict[str, int] = {}
+    if not isinstance(second.prompt_tokens, Unavailable):
+        usage_details["prompt_tokens"] = second.prompt_tokens
+    if not isinstance(second.completion_tokens, Unavailable):
+        usage_details["completion_tokens"] = second.completion_tokens
+    outcome = record_trace(
+        config=config,
+        name="openrouter-inference",
+        model=model_for_trace,
+        input={"prompt": prompt},
+        output=second.text,
+        usage_details=usage_details,
+    )
+    trace_status = outcome.status
+    trace_id = outcome.trace_id
+    trace_url = outcome.trace_url
+
+    telemetry = TelemetryEvidence(
+        model=second.model,
+        provider=second.provider,
+        latency_ms=second.latency_ms,
+        prompt_tokens=second.prompt_tokens,
+        completion_tokens=second.completion_tokens,
+        total_tokens=second.total_tokens,
+        cost_usd=second.cost_usd,
+        cache_status=repeat.cache_status,
+        cached_tokens=repeat.cached_tokens,
+        cache_write_tokens=repeat.cache_write_tokens,
+        openrouter_metadata=second.openrouter_metadata,
+        trace_status=trace_status,
+        trace_id=trace_id,
+        trace_url=trace_url,
+    )
+    run = InferenceRun(
+        run_id=uuid.uuid4().hex,
+        prompt=prompt,
+        strategy_name=strategy.name,
+        started_at=started_at,
+        completed_at=datetime.now(UTC),
+        status=Status.SUCCEEDED,
+        streamed_text=second.text or "".join(text_parts),
+        error_message=None,
+        telemetry=telemetry,
+        repeat_observation=repeat,
     )
     history.append(run)
     return run
@@ -433,13 +731,23 @@ def build_app(
                 yield event
 
         selected_strategy = STRATEGIES.get(strategy_select.value, DEFAULT_STRATEGY)
-        if simulate_failure.value:
+        if repeat_enabled.value:
+            run = await _run_repeat_inference(
+                prompt_text,
+                api_key=os.environ.get(OPENROUTER_API_KEY, ""),
+                history=history,
+                strategy=selected_strategy,
+                config=config,
+                stream_fn=observed_stream,
+            )
+        elif simulate_failure.value:
             run = await _run_fallback_inference(
                 prompt_text,
                 api_key=os.environ.get(OPENROUTER_API_KEY, ""),
                 history=history,
                 fallback_strategy=selected_strategy,
                 stream_fn=observed_stream,
+                config=config,
             )
         else:
             run = await _run_inference(
@@ -448,6 +756,7 @@ def build_app(
                 history=history,
                 stream_fn=observed_stream,
                 strategy=selected_strategy,
+                config=config,
             )
         state.is_running = False
         state.last_run = run
@@ -521,6 +830,10 @@ def build_app(
                 strategy_description_label.text = selected.description
 
             strategy_select.on("update:model-value", update_strategy_description)
+            repeat_enabled = ui.switch("Repeat previous prompt", value=False)
+            ui.label("Runs the same prompt twice and reports cache evidence or latency/cost delta.").classes(
+                "text-sm text-gray-600"
+            )
             simulate_failure = ui.switch("Simulate primary route failure", value=False)
             ui.label("For a reproducible demo. The UI will label this as simulated.").classes(
                 "text-sm text-gray-600"
@@ -533,12 +846,3 @@ def build_app(
             telemetry_panel()
 
         history_panel()
-
-        with ui.card().classes("w-full"):
-            ui.label("Future operation panels").classes("font-semibold")
-            ui.label(
-                "Cache, trace links, and eval execution stay reserved for later phases."
-            ).classes("text-sm text-gray-600")
-            ui.label("Optional Langfuse variables: " + ", ".join(LANGFUSE_ENV_VARS)).classes(
-                "text-sm text-gray-600"
-            )

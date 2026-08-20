@@ -5,7 +5,69 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
-from openrouter_demo.models import InferenceRun, Status, TelemetryEvidence
+from openrouter_demo.models import (
+    AttemptRecord,
+    FallbackEvidence,
+    InferenceRun,
+    RepeatObservation,
+    Status,
+    StreamedResult,
+    TelemetryEvidence,
+    deserialize_value,
+)
+
+
+def _deserialize(value: object) -> object:
+    return deserialize_value(value)
+
+
+def _attempt_from_dict(data: dict) -> AttemptRecord:
+    return AttemptRecord(
+        model=_deserialize(data.get("model")),
+        provider=_deserialize(data.get("provider")),
+        status=Status(data["status"]) if data.get("status") else Status.FAILED,
+        error_message=data.get("error_message"),
+        latency_ms=data.get("latency_ms") or 0,
+        prompt_tokens=_deserialize(data.get("prompt_tokens")),
+        completion_tokens=_deserialize(data.get("completion_tokens")),
+        total_tokens=_deserialize(data.get("total_tokens")),
+        cost_usd=_deserialize(data.get("cost_usd")),
+    )
+
+
+def _streamed_result_from_dict(data: dict) -> StreamedResult:
+    return StreamedResult(
+        text=data.get("text") or "",
+        model=_deserialize(data.get("model")),
+        provider=_deserialize(data.get("provider")),
+        prompt_tokens=_deserialize(data.get("prompt_tokens")),
+        completion_tokens=_deserialize(data.get("completion_tokens")),
+        total_tokens=_deserialize(data.get("total_tokens")),
+        cost_usd=_deserialize(data.get("cost_usd")),
+        latency_ms=data.get("latency_ms") or 0,
+        cache_status=_deserialize(data.get("cache_status")),
+        cached_tokens=_deserialize(data.get("cached_tokens")),
+        cache_write_tokens=_deserialize(data.get("cache_write_tokens")),
+        openrouter_metadata=_deserialize(data.get("openrouter_metadata")),
+    )
+
+
+def _fallback_evidence_from_dict(data: dict) -> FallbackEvidence:
+    return FallbackEvidence(
+        primary=_attempt_from_dict(data["primary"]),
+        fallback=_attempt_from_dict(data["fallback"]),
+        simulated=bool(data.get("simulated", False)),
+    )
+
+
+def _repeat_observation_from_dict(data: dict) -> RepeatObservation:
+    return RepeatObservation(
+        first=_streamed_result_from_dict(data["first"]),
+        second=_streamed_result_from_dict(data["second"]),
+        cache_status=_deserialize(data.get("cache_status")),
+        cached_tokens=_deserialize(data.get("cached_tokens")),
+        cache_write_tokens=_deserialize(data.get("cache_write_tokens")),
+    )
 
 
 class SQLiteRunHistory:
@@ -41,7 +103,16 @@ class SQLiteRunHistory:
             self._conn.commit()
 
     def append(self, run: InferenceRun) -> None:
-        telemetry_json = json.dumps(asdict(run.telemetry) if run.telemetry is not None else None)
+        payload = {
+            "telemetry": run.telemetry.to_dict() if run.telemetry is not None else None,
+            "fallback_evidence": asdict(run.fallback_evidence)
+            if run.fallback_evidence is not None
+            else None,
+            "repeat_observation": asdict(run.repeat_observation)
+            if run.repeat_observation is not None
+            else None,
+        }
+        telemetry_json = json.dumps(payload)
         with self._lock:
             cur = self._conn.cursor()
             cur.execute(
@@ -91,18 +162,28 @@ class SQLiteRunHistory:
 
     def _row_to_run(self, row: sqlite3.Row) -> InferenceRun:
         telemetry = None
+        fallback_evidence = None
+        repeat_observation = None
         if row["telemetry_json"]:
-            tel = json.loads(row["telemetry_json"])
-            if tel is not None:
-                telemetry = TelemetryEvidence(
-                    model=tel.get("model"),
-                    provider=tel.get("provider"),
-                    latency_ms=tel.get("latency_ms") or 0,
-                    prompt_tokens=tel.get("prompt_tokens"),
-                    completion_tokens=tel.get("completion_tokens"),
-                    total_tokens=tel.get("total_tokens"),
-                    cost_usd=tel.get("cost_usd"),
-                )
+            doc = json.loads(row["telemetry_json"])
+            if doc is not None:
+                if isinstance(doc, dict) and "telemetry" in doc:
+                    if doc.get("telemetry") is not None:
+                        telemetry = TelemetryEvidence.from_dict(doc["telemetry"])
+                    if doc.get("fallback_evidence") is not None:
+                        fallback_evidence = _fallback_evidence_from_dict(doc["fallback_evidence"])
+                    if doc.get("repeat_observation") is not None:
+                        repeat_observation = _repeat_observation_from_dict(doc["repeat_observation"])
+                else:
+                    telemetry = TelemetryEvidence(
+                        model=doc.get("model"),
+                        provider=doc.get("provider"),
+                        latency_ms=doc.get("latency_ms") or 0,
+                        prompt_tokens=doc.get("prompt_tokens"),
+                        completion_tokens=doc.get("completion_tokens"),
+                        total_tokens=doc.get("total_tokens"),
+                        cost_usd=doc.get("cost_usd"),
+                    )
         started_at = datetime.fromisoformat(row["started_at"]) if row["started_at"] else None
         completed_at = datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None
         status = Status(row["status"]) if row["status"] else Status.FAILED
@@ -116,4 +197,6 @@ class SQLiteRunHistory:
             streamed_text=row["streamed_text"],
             error_message=row["error_message"],
             telemetry=telemetry,
+            fallback_evidence=fallback_evidence,
+            repeat_observation=repeat_observation,
         )

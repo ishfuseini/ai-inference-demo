@@ -8,6 +8,7 @@ from openrouter_demo.client import OpenRouterError, stream_chat_completion
 from openrouter_demo.models import (
     UNAVAILABLE,
     AttemptRecord,
+    RepeatObservation,
     Status,
     StreamChunk,
     StreamedResult,
@@ -82,4 +83,38 @@ async def run_fallback_scenario(
         primary=primary_record,
         fallback=fallback_result,
         simulated=True,
+    )
+
+
+async def run_repeat_scenario(
+    prompt: str,
+    *,
+    strategy: RoutingStrategy,
+    api_key: str,
+    stream_fn: StreamFn = stream_chat_completion,
+) -> AsyncIterator[StreamChunk | RepeatObservation]:
+    # Run 1: observe the first call but do NOT stream it to the UI.
+    first_result: StreamedResult | None = None
+    async for event in stream_fn(prompt, strategy=strategy, api_key=api_key):
+        if isinstance(event, StreamedResult):
+            first_result = event
+
+    # Run 2: stream chunks progressively and collect the final result.
+    second_result: StreamedResult | None = None
+    async for event in stream_fn(prompt, strategy=strategy, api_key=api_key):
+        if isinstance(event, StreamChunk):
+            yield event
+        elif isinstance(event, StreamedResult):
+            second_result = event
+
+    if first_result is None or second_result is None:
+        return
+
+    # Cache status derives only from run 2's prompt_tokens_details.
+    yield RepeatObservation(
+        first=first_result,
+        second=second_result,
+        cache_status=second_result.cache_status,
+        cached_tokens=second_result.cached_tokens,
+        cache_write_tokens=second_result.cache_write_tokens,
     )

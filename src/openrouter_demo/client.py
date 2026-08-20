@@ -96,6 +96,23 @@ def _extract_usage(payload: dict) -> tuple[int | Unavailable, int | Unavailable,
     return pt, ct, tt, co
 
 
+def _extract_cache(usage: dict) -> tuple[str | Unavailable, int | Unavailable, int | Unavailable]:
+    if not isinstance(usage, dict):
+        return UNAVAILABLE, UNAVAILABLE, UNAVAILABLE
+    details = usage.get("prompt_tokens_details")
+    if not isinstance(details, dict):
+        return UNAVAILABLE, UNAVAILABLE, UNAVAILABLE
+    cached = details.get("cached_tokens")
+    written = details.get("cache_write_tokens")
+    ct: int | Unavailable = cached if isinstance(cached, int) else UNAVAILABLE
+    wt: int | Unavailable = written if isinstance(written, int) else UNAVAILABLE
+    if isinstance(ct, int) and ct > 0:
+        return "hit", ct, wt
+    if isinstance(wt, int) and wt > 0:
+        return "write", ct, wt
+    return UNAVAILABLE, UNAVAILABLE, UNAVAILABLE
+
+
 async def stream_chat_completion(
     prompt: str,
     *,
@@ -121,6 +138,7 @@ async def stream_chat_completion(
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
+        "X-OpenRouter-Metadata": "enabled",
     }
 
     start = time.monotonic()
@@ -131,6 +149,10 @@ async def stream_chat_completion(
     seen_ct: int | Unavailable = UNAVAILABLE
     seen_tt: int | Unavailable = UNAVAILABLE
     seen_cost: float | Unavailable = UNAVAILABLE
+    seen_cache_status: str | Unavailable = UNAVAILABLE
+    seen_cached_tokens: int | Unavailable = UNAVAILABLE
+    seen_cache_write_tokens: int | Unavailable = UNAVAILABLE
+    seen_router_metadata: dict | Unavailable = UNAVAILABLE
 
     owns_client = http_client is None
     client = http_client if http_client is not None else httpx.AsyncClient(timeout=request_timeout)
@@ -199,6 +221,18 @@ async def stream_chat_completion(
                     if not isinstance(co, Unavailable):
                         seen_cost = co
 
+                    cs, cct, cwt = _extract_cache(payload.get("usage"))
+                    if not isinstance(cs, Unavailable):
+                        seen_cache_status = cs
+                    if not isinstance(cct, Unavailable):
+                        seen_cached_tokens = cct
+                    if not isinstance(cwt, Unavailable):
+                        seen_cache_write_tokens = cwt
+
+                    router_meta = payload.get("openrouter_metadata")
+                    if isinstance(router_meta, dict):
+                        seen_router_metadata = router_meta
+
                     delta = _delta_content(payload)
                     if delta is not None:
                         text_parts.append(delta)
@@ -229,6 +263,10 @@ async def stream_chat_completion(
             total_tokens=seen_tt,
             cost_usd=seen_cost,
             latency_ms=latency_ms,
+            cache_status=seen_cache_status,
+            cached_tokens=seen_cached_tokens,
+            cache_write_tokens=seen_cache_write_tokens,
+            openrouter_metadata=seen_router_metadata,
         )
     finally:
         if owns_client:

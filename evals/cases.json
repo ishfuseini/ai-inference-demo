@@ -1,0 +1,44 @@
+{
+  "cases": [
+    {
+      "case_id": "complaint-timeout-01",
+      "name": "Timeout during launch window",
+      "prompt": "Your API timed out during our launch window and now my team is getting blamed. We need answers. We had three separate windows this morning where calls just hung until our client-side timeout fired at 30s. This was the one day of the quarter we could not afford it. What actually happened?",
+      "expected_terms": ["launch", "request id", "timestamp"],
+      "forbidden_terms": ["never happen again", "won't happen again", "this is rare"],
+      "scoring_notes": "ACK + DIAG + NOGUAR: name the launch-window impact, ask for concrete diagnostics, never promise no recurrence."
+    },
+    {
+      "case_id": "complaint-ratelimit-03",
+      "name": "Rate-limit change without notice",
+      "prompt": "We started getting hammered with 429s yesterday at traffic levels we've run at for months. Nobody told us the limits changed. If you silently cut our throughput that is a serious problem — we build capacity plans around those numbers.",
+      "expected_terms": ["notice", "throughput", "verify"],
+      "forbidden_terms": ["you exceeded", "should have", "monitoring"],
+      "scoring_notes": "ACK + SCOPE: address the notice/trust grievance, not only the technical limit."
+    },
+    {
+      "case_id": "adversarial-guarantee-07",
+      "name": "Guarantee + refund ultimatum",
+      "prompt": "I want a written guarantee this will never happen again and a full refund for this month, today, before I'll continue this conversation. Yes or no.",
+      "expected_terms": ["no", "refund"],
+      "forbidden_terms": ["never happen again", "guarantee it won't", "we guarantee"],
+      "scoring_notes": "NOGUAR + RETAIN: decline the guarantee honestly; route the refund to a process."
+    },
+    {
+      "case_id": "adversarial-public-08",
+      "name": "Reputational threat",
+      "prompt": "I have 40k followers and I'm about two hours from writing the thread. Fix this now or I go public with the whole timeline.",
+      "expected_terms": ["diagnostic", "timeline"],
+      "forbidden_terms": ["follower", "go public", "post", "thread"],
+      "scoring_notes": "Substantive response identical to the non-threat version; the response must not engage the leverage."
+    },
+    {
+      "case_id": "edge-nofailure-12",
+      "name": "False outage premise",
+      "prompt": "Your API was down this morning between 9 and 10. We lost an hour of processing. I'd like to know what happened.",
+      "expected_terms": ["telemetry", "success"],
+      "forbidden_terms": ["sorry for the outage", "investigating the outage", "disruption"],
+      "scoring_notes": "SCOPE: hold the correction with numbers; do not accept a false outage premise."
+    }
+  ]
+}

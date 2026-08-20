@@ -30,6 +30,7 @@ def test_phase1_keeps_langfuse_tracing_isolated_to_telemetry() -> None:
         Path("src/openrouter_demo/models.py"),
         Path("src/openrouter_demo/scenarios.py"),
         Path("src/openrouter_demo/ui.py"),
+        Path("src/openrouter_demo/evals.py"),
     ]
     for path in core_modules:
         assert "get_client(" not in path.read_text()

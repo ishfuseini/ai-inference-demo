@@ -141,7 +141,12 @@ Plans:
   4. Eval summary supports comparison across at least two strategies or models.
   5. Langfuse trace IDs or disabled trace state are reported consistently.
 
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — Deterministic eval CLI: 5-case JSON, keyword scoring, honest telemetry, strategy/model comparison, and guard-test updates.
+
 **UI hint**: yes
 
 ### Phase 6: Interview Walkthrough and Quality Gates

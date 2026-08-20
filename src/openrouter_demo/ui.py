@@ -8,9 +8,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
-from fastapi.staticfiles import StaticFiles
 from nicegui import app as ng_app
 from nicegui import ui
+from starlette.staticfiles import StaticFiles
 
 from openrouter_demo.client import OpenRouterError, stream_chat_completion
 from openrouter_demo.config import OPENROUTER_API_KEY, AppConfig
@@ -74,6 +74,8 @@ review, the verdict, DESIGN.md, and every shipping raster carrying its provenanc
   --color-accent: #8A2BE2;
   --color-accent-hover: #6E21B8;
   --color-accent-subtle: #F1E9FB;
+  --color-sample-button: #B3B3B3;
+  --color-sample-button-text: #4B4B4B;
   --color-rule: #D8D7D2;
   --color-rule-strong: #111111;
 
@@ -152,6 +154,7 @@ body {
   color: var(--color-ink);
   padding-bottom: var(--space-3);
   border-bottom: 3px solid var(--color-rule-strong);
+  margin: 0;
 }
 
 .demo-brand-label {
@@ -191,6 +194,7 @@ body {
   line-height: 1.25;
   letter-spacing: -0.01em;
   color: var(--color-ink);
+  margin: 0;
 }
 
 .demo-component-heading {
@@ -200,6 +204,7 @@ body {
   color: var(--color-ink);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  margin: 0;
 }
 
 .demo-avatar {
@@ -270,21 +275,31 @@ body {
   opacity: 1 !important;
 }
 
-/* Secondary button — black outline, paper fill on hover */
-.q-btn.demo-btn-secondary {
+/* Secondary sample buttons — transparent until hover, quieter than the primary action */
+.q-btn.demo-btn-secondary,
+.q-btn.demo-btn-secondary.text-primary {
   font-family: var(--font-ui);
-  font-weight: 500;
-  font-size: var(--text-label);
+  font-weight: 600;
+  font-size: var(--text-body);
   line-height: 1.4;
-  color: var(--color-ink) !important;
+  color: var(--color-sample-button-text) !important;
+  background: transparent !important;
   background-color: transparent !important;
-  border: 1px solid var(--color-ink) !important;
+  border: 1px solid var(--color-sample-button) !important;
   border-radius: var(--radius-sm) !important;
+  padding: var(--space-2) var(--space-4);
+  box-shadow: none !important;
   text-transform: none !important;
-  transition: background-color 0.15s ease-out;
+  transition:
+    background-color 0.15s ease-out,
+    border-color 0.15s ease-out,
+    color 0.15s ease-out;
 }
-.q-btn.demo-btn-secondary:hover {
-  background-color: var(--color-surface-alt) !important;
+.q-btn.demo-btn-secondary:hover,
+.q-btn.demo-btn-secondary.text-primary:hover {
+  background-color: var(--color-sample-button) !important;
+  border-color: transparent !important;
+  color: var(--color-ink) !important;
 }
 
 /* --- Telemetry table — full width, bordered, no stripe --- */
@@ -335,10 +350,32 @@ body {
 .demo-grid-scroll {
   overflow-x: auto;
   width: 100%;
+  padding-bottom: var(--space-2);
+  scrollbar-color: var(--color-rule) transparent;
+  scrollbar-width: thin;
+}
+
+.demo-grid-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.demo-grid-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.demo-grid-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-rule);
+  border-radius: 0;
+}
+
+.demo-grid-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
 }
 
 .demo-grid-scroll .nicegui-grid {
-  min-width: max-content;
+  width: max-content;
+  min-width: 100%;
 }
 
 .demo-grid-header {
@@ -362,7 +399,19 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+}
+
+.demo-grid-link,
+.demo-grid-link:visited {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.demo-grid-link:hover {
+  color: var(--color-accent);
 }
 
 .demo-cell-tooltip {
@@ -391,6 +440,24 @@ body {
   font-size: var(--text-detail);
   line-height: 1.5;
   color: var(--color-text-secondary);
+}
+
+.demo-strategy-select {
+  --q-primary: var(--color-ink) !important;
+}
+
+.demo-strategy-select.q-field--focused .q-field__control {
+  box-shadow: inset 0 -2px 0 var(--color-ink) !important;
+}
+
+.demo-strategy-select .q-field__control::after {
+  background: var(--color-ink) !important;
+}
+
+.demo-strategy-menu .q-item--active,
+.demo-strategy-menu .q-item--focused {
+  color: var(--color-ink) !important;
+  background-color: var(--color-surface-alt) !important;
 }
 
 .demo-toggle-row .q-checkbox__label {
@@ -508,8 +575,36 @@ body {
 /* --- Browser surfaces --- */
 
 *:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-accent) !important;
   outline-offset: 2px;
+}
+
+.q-focusable:focus,
+.q-btn:focus,
+.q-field__native:focus,
+.q-toggle:focus,
+.q-tab:focus {
+  outline: 2px solid var(--color-accent) !important;
+  outline-offset: 3px;
+}
+
+.q-btn:focus,
+.q-toggle:focus,
+.q-tab:focus {
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent) !important;
+}
+
+.q-field__native:focus {
+  box-shadow: inset 0 -2px 0 var(--color-accent) !important;
+}
+
+.q-field--focused .q-field__control {
+  box-shadow: 0 0 0 2px var(--color-accent) !important;
+}
+
+.q-btn.disabled:focus,
+.q-btn[disabled]:focus {
+  outline: none !important;
 }
 
 ::selection {
@@ -607,11 +702,13 @@ def _format_router_cell(telemetry: TelemetryEvidence | None) -> str:
     return _UNAVAILABLE_COPY
 
 
+def _heading(text: str, *, level: int, classes: str) -> None:
+    ui.html(text, tag=f"h{level}").classes(classes)
+
+
 SAMPLE_PROMPTS = (
-    "Explain eventual consistency to a backend engineer.",
     "Summarize this incident report for a customer.",
     "Classify this support ticket by severity.",
-    "Extract action items from this meeting note.",
 )
 
 EMPTY_RESPONSE = "Run an inference request to see streaming output."
@@ -717,23 +814,19 @@ def _history_cache_label(run: InferenceRun) -> str:
     return "—"
 
 
-def _history_trace_label(run: InferenceRun) -> str:
+def _history_trace_href(run: InferenceRun) -> str | None:
     telemetry = run.telemetry
     if telemetry is None:
-        return "—"
-    if telemetry.trace_status == "enabled":
-        return telemetry.trace_url or telemetry.trace_id or "—"
-    if telemetry.trace_status == "disabled":
-        return "disabled"
-    if telemetry.trace_status == "failed":
-        return "failed"
-    return "—"
+        return None
+    if telemetry.trace_status == "enabled" and telemetry.trace_url:
+        return telemetry.trace_url
+    return None
 
 
 def _history_rows(
     history: RunHistory,
-) -> list[tuple[str, str, str, str, str, str, str, str, str, str]]:
-    rows: list[tuple[str, str, str, str, str, str, str, str, str, str]] = []
+) -> list[tuple[str, str, str, str, str, str, str, str, str]]:
+    rows: list[tuple[str, str, str, str, str, str, str, str, str]] = []
     for index, run in enumerate(history.all(), start=1):
         telemetry = run.telemetry
         fallback_label = "Yes" if run.fallback_evidence is not None else "—"
@@ -754,25 +847,29 @@ def _history_rows(
                 _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable()),
                 fallback_label,
                 _history_cache_label(run),
-                _history_trace_label(run),
             )
         )
     return rows
 
 
+def _comparison_runs(history: RunHistory, limit: int = 10) -> list[tuple[int, InferenceRun]]:
+    completed = [
+        (index, run)
+        for index, run in enumerate(history.all(), start=1)
+        if run.status in (Status.SUCCEEDED, Status.FALLBACK_SUCCEEDED)
+    ]
+    return completed[:limit]
+
+
 def _comparison_rows(
     history: RunHistory, limit: int = 10
 ) -> list[tuple[str, str, str, str, str, str]]:
-    completed = [
-        run
-        for run in history.all()
-        if run.status in (Status.SUCCEEDED, Status.FALLBACK_SUCCEEDED)
-    ]
     rows: list[tuple[str, str, str, str, str, str]] = []
-    for run in completed[:limit]:
+    for index, run in _comparison_runs(history, limit=limit):
         telemetry = run.telemetry
         rows.append(
             (
+                str(index),
                 _format_metadata(telemetry.model) if telemetry else _format_metadata(Unavailable()),
                 _format_metadata(telemetry.provider)
                 if telemetry
@@ -782,7 +879,6 @@ def _comparison_rows(
                 else _format_latency(Unavailable()),
                 _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable()),
                 _history_cache_label(run),
-                _history_trace_label(run),
             )
         )
     return rows
@@ -790,43 +886,75 @@ def _comparison_rows(
 
 def _render_telemetry(run: InferenceRun | None, *, is_running: bool = False) -> None:
     with ui.card().classes("w-full demo-card"):
-        ui.label("Telemetry").classes("demo-section-heading")
-        with ui.element("div").classes("demo-telemetry-table"):
+        _heading("Telemetry", level=2, classes="demo-section-heading")
+        with ui.element("div").classes("demo-telemetry-table").props(
+            'role="table" aria-label="Run telemetry"'
+        ):
             for label, value in _telemetry_rows(run, is_running=is_running):
-                with ui.element("div").classes("demo-telemetry-row"):
-                    ui.label(label).classes("demo-telemetry-label")
-                    ui.label(value).classes("demo-telemetry-value")
+                with ui.element("div").classes("demo-telemetry-row").props('role="row"'):
+                    ui.label(label).classes("demo-telemetry-label").props('role="rowheader"')
+                    ui.label(value).classes("demo-telemetry-value").props('role="cell"')
+
+
+def _content_sized_grid_style(column_count: int) -> str:
+    return f"grid-template-columns: repeat({column_count}, max-content);"
 
 
 def _render_history(history: RunHistory) -> None:
     with ui.card().classes("w-full demo-card"):
-        ui.label("Run history").classes("demo-section-heading")
+        _heading("Run history", level=2, classes="demo-section-heading")
         rows = _history_rows(history)
         if not rows:
             ui.label(
-                "Previous runs will appear here for cost, latency, and route comparison."
+                "Previous runs will appear here for route, fallback, cost, latency, cache, and trace review."
             ).classes("demo-supporting")
             return
-        columns = ("Run", "Strategy", "Model", "Provider", "Latency", "Tokens", "Cost", "Fallback", "Cache", "Trace")
-        with ui.element("div").classes("demo-grid-scroll"), ui.grid(columns=len(columns)).classes("w-full"):
-                for column in columns:
-                    ui.label(column).classes("demo-grid-header")
-                for row in rows:
-                    for value in row:
-                        with ui.label(value).classes("demo-grid-cell"):
+        columns = ("Run", "Strategy", "Model", "Provider", "Latency", "Tokens", "Cost", "Fallback", "Cache")
+        grid_style = _content_sized_grid_style(len(columns))
+        with ui.element("div").classes("demo-grid-scroll").props(
+            'role="table" aria-label="Run history"'
+        ), ui.grid(columns=len(columns)).classes("w-full").style(grid_style):
+            for column in columns:
+                ui.label(column).classes("demo-grid-header").props('role="columnheader"')
+            for row, run in zip(rows, history.all(), strict=True):
+                trace_href = _history_trace_href(run)
+                for cell_index, value in enumerate(row):
+                    with ui.element("div").classes("demo-grid-cell").props('role="cell"'):
+                        if cell_index == 0 and trace_href is not None:
+                            ui.link(value, trace_href, new_tab=True).classes("demo-grid-link")
+                            ui.tooltip(f"Open trace: {trace_href}")
+                        else:
+                            ui.label(value)
                             ui.tooltip(value)
 
+
+def _render_comparison(history: RunHistory) -> None:
+    with ui.card().classes("w-full demo-card"):
+        _heading("Comparison", level=2, classes="demo-section-heading")
         comparison = _comparison_rows(history)
-        if comparison:
-            ui.label("Comparison").classes("demo-component-heading")
-            comparison_columns = ("Model", "Provider", "Latency", "Cost", "Cache", "Trace")
-            with ui.element("div").classes("demo-grid-scroll"), ui.grid(columns=len(comparison_columns)).classes("w-full"):
-                    for column in comparison_columns:
-                        ui.label(column).classes("demo-grid-header")
-                    for row in comparison:
-                        for value in row:
-                            with ui.label(value).classes("demo-grid-cell"):
-                                ui.tooltip(value)
+        if not comparison:
+            ui.label(
+                "Successful runs will appear here for side-by-side cost, latency, and cache comparison."
+            ).classes("demo-supporting")
+            return
+        comparison_columns = ("Run", "Model", "Provider", "Latency", "Cost", "Cache")
+        comparison_runs = _comparison_runs(history)
+        grid_style = _content_sized_grid_style(len(comparison_columns))
+        with ui.element("div").classes("demo-grid-scroll").props(
+            'role="table" aria-label="Run comparison"'
+        ), ui.grid(columns=len(comparison_columns)).classes("w-full").style(grid_style):
+            for column in comparison_columns:
+                ui.label(column).classes("demo-grid-header").props('role="columnheader"')
+            for row, (_, run) in zip(comparison, comparison_runs, strict=True):
+                trace_href = _history_trace_href(run)
+                for cell_index, value in enumerate(row):
+                    with ui.element("div").classes("demo-grid-cell").props('role="cell"'):
+                        if cell_index == 0 and trace_href is not None:
+                            ui.link(value, trace_href, new_tab=True).classes("demo-grid-link")
+                            ui.tooltip(f"Open trace: {trace_href}")
+                        else:
+                            ui.label(value)
+                            ui.tooltip(value)
 
 
 async def _run_inference(
@@ -1169,7 +1297,7 @@ async def _run_repeat_inference(
 def _status_item(label: str, ready: bool, detail: str) -> None:
     dot_class = "demo-status-dot--ready" if ready else "demo-status-dot--warning"
     short_detail = "Ready" if ready else "Needs setup"
-    with ui.element("div").classes("demo-status-item"):
+    with ui.element("div").classes("demo-status-item").props(f'aria-label="{label}: {detail}"'):
         ui.element("div").classes(f"demo-status-dot {dot_class}")
         ui.label(label).classes("demo-status-item-label")
         ui.label(short_detail).classes("demo-status-item-detail")
@@ -1201,7 +1329,7 @@ def build_app(
     @ui.refreshable
     def response_panel() -> None:
         with ui.card().classes("w-full demo-card"):
-            ui.label("Streaming response").classes("demo-section-heading")
+            _heading("Streaming response", level=2, classes="demo-section-heading")
             status_class = "demo-response-status"
             if state.is_running:
                 status_class += " demo-response-status--streaming"
@@ -1222,6 +1350,10 @@ def build_app(
     @ui.refreshable
     def history_panel() -> None:
         _render_history(history)
+
+    @ui.refreshable
+    def comparison_panel() -> None:
+        _render_comparison(history)
 
     def refresh(panel: object) -> None:
         cast(Any, panel).refresh()
@@ -1291,6 +1423,7 @@ def build_app(
         refresh(response_panel)
         refresh(telemetry_panel)
         refresh(history_panel)
+        refresh(comparison_panel)
 
     def fill_prompt(value: str) -> None:
         prompt.value = value
@@ -1302,8 +1435,8 @@ def build_app(
         # Header: avatar inline-left of big title, brand label below rule
         with ui.column().classes("gap-0 w-full"):
             with ui.row().classes("items-center gap-4"):
-                ui.image("/assets/ish-avatar.png").classes("demo-avatar")
-                ui.label("Production Inference Lab").classes("demo-page-title")
+                ui.image("/assets/ish-avatar.png").classes("demo-avatar").props('alt=""')
+                _heading("Production Inference Lab", level=1, classes="demo-page-title")
             ui.label("ishlab").classes("demo-brand-label")
 
         ui.label("Route, observe, recover, and evaluate model calls.").classes("demo-supporting")
@@ -1312,7 +1445,9 @@ def build_app(
         )
 
         # Compact inline status bar
-        with ui.element("div").classes("demo-status-bar"):
+        with ui.element("div").classes("demo-status-bar").props(
+            'role="status" aria-label="Credential status"'
+        ):
             _status_item(
                 "OpenRouter",
                 config.openrouter_ready,
@@ -1331,32 +1466,36 @@ def build_app(
         # Setup guidance (only when not ready)
         if not config.openrouter_ready:
             with ui.card().classes("w-full demo-setup-banner"):
-                ui.label("Setup needed").classes("demo-component-heading")
+                _heading("Setup needed", level=2, classes="demo-component-heading")
                 ui.label(f"Set {OPENROUTER_API_KEY} in your shell, then restart the app.").classes(
                     "demo-body"
                 )
 
         # Request panel with section dividers
         with ui.card().classes("w-full demo-card"):
-            ui.label("Prompt").classes("demo-component-heading")
+            _heading("Prompt", level=2, classes="demo-component-heading")
             prompt = ui.textarea(
                 placeholder="Ask a production-style question, classification task, or summarization task...",
                 on_change=lambda _: sync_run_button(),
-            ).classes("w-full")
+            ).classes("w-full").props('aria-label="Prompt"')
             ui.label("Sample prompt").classes("demo-label")
             with ui.row().classes("w-full gap-2 flex-wrap"):
                 for sample in SAMPLE_PROMPTS:
                     ui.button(sample, on_click=lambda sample=sample: fill_prompt(sample)).props(
-                        "flat dense"
-                    ).classes("demo-btn-secondary")
+                        "flat"
+                    ).classes("demo-btn-secondary").style(
+                        "--q-primary: var(--color-sample-button-text);"
+                    )
 
             ui.element("div").classes("demo-section-divider")
 
-            ui.label("Strategy").classes("demo-component-heading")
+            _heading("Strategy", level=2, classes="demo-component-heading")
             strategy_select = ui.select(
                 options={s.name: ROUTING_STRATEGY_LABELS[s.name] for s in STRATEGIES.values()},
                 value=DEFAULT_STRATEGY.name,
-            ).classes("w-full")
+            ).classes("w-full demo-strategy-select").props(
+                'aria-label="Routing strategy" popup-content-class=demo-strategy-menu'
+            ).style("--q-primary: var(--color-ink);")
             strategy_description_label = ui.label(DEFAULT_STRATEGY.description).classes(
                 "demo-strategy-desc"
             )
@@ -1388,12 +1527,15 @@ def build_app(
         # Response panel (full width)
         response_panel()
 
-        # Tabbed evidence: Telemetry + Run History
+        # Tabbed evidence: Telemetry + Run History + Comparison
         with ui.tabs().props("align=left").classes("w-full demo-tabs") as tabs:
             ui.tab("Telemetry")
             ui.tab("Run History")
+            ui.tab("Comparison")
         with ui.tab_panels(tabs, value="Telemetry").classes("w-full"):
             with ui.tab_panel("Telemetry"):
                 telemetry_panel()
             with ui.tab_panel("Run History"):
                 history_panel()
+            with ui.tab_panel("Comparison"):
+                comparison_panel()

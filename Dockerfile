@@ -14,6 +14,7 @@ COPY src/ ./src/
 COPY app.py ./
 COPY evals/ ./evals/
 COPY data/ ./data/
+COPY assets/ ./assets/
 
 # Expose the port NiceGUI listens on
 EXPOSE 8080

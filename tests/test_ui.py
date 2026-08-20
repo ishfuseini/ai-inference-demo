@@ -19,6 +19,7 @@ from openrouter_demo.models import (
 from openrouter_demo.routing import COST_STRATEGY, DEFAULT_STRATEGY, LATENCY_STRATEGY, STRATEGIES
 from openrouter_demo.ui import (
     FALLBACK_SUCCESS_RESPONSE,
+    SAMPLE_PROMPTS,
     STREAMING_RESPONSE,
     _comparison_rows,
     _format_cost,
@@ -861,3 +862,15 @@ def test_ui_has_no_chatbot_labels() -> None:
         "Send message",
     ):
         assert forbidden not in text
+
+
+def test_sample_prompt_buttons_have_short_labels_and_full_prompts() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "ui.button(" in text
+    assert "sample.label" in text
+    assert "fill_prompt(sample.prompt)" in text
+    assert all(sample.label != sample.prompt for sample in SAMPLE_PROMPTS)
+    assert all(len(sample.label) <= 32 for sample in SAMPLE_PROMPTS)
+    assert any("lost access for nearly two hours" in sample.prompt for sample in SAMPLE_PROMPTS)
+    assert any("what information may have been affected" in sample.prompt for sample in SAMPLE_PROMPTS)

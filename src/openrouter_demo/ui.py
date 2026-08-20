@@ -163,7 +163,6 @@ body {
   font-size: var(--text-label);
   line-height: 1.4;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--color-ink-secondary);
   margin-top: var(--space-2);
 }
@@ -707,9 +706,21 @@ def _heading(text: str, *, level: int, classes: str) -> None:
     ui.html(text, tag=f"h{level}").classes(classes)
 
 
+@dataclass(frozen=True)
+class SamplePrompt:
+    label: str
+    prompt: str
+
+
 SAMPLE_PROMPTS = (
-    "Summarize this customer support message. --- The service is back now, so I am not asking for an immediate fix. But we lost access for nearly two hours, and your support team never acknowledged the issue. I need a written explanation of what happened and how you’ll prevent it from happening again.",
-    "Classify this support ticket by severity. -- The security issue appears to have been contained, so I’m not asking you to take emergency action on our account. However, we received no timely notification and had to learn about the incident through another channel. I need a written summary of what happened, what information may have been affected, and what protections are now in place.",
+    SamplePrompt(
+        label="Summarize support complaint",
+        prompt="Summarize this customer support message. --- The service is back now, so I am not asking for an immediate fix. But we lost access for nearly two hours, and your support team never acknowledged the issue. I need a written explanation of what happened and how you’ll prevent it from happening again.",
+    ),
+    SamplePrompt(
+        label="Classify security ticket",
+        prompt="Classify this support ticket by severity. -- The security issue appears to have been contained, so I’m not asking you to take emergency action on our account. However, we received no timely notification and had to learn about the incident through another channel. I need a written summary of what happened, what information may have been affected, and what protections are now in place.",
+    ),
 )
 
 EMPTY_RESPONSE = "Run an inference request to see streaming output."
@@ -1301,7 +1312,7 @@ def _status_item(label: str, ready: bool, detail: str) -> None:
     with ui.element("div").classes("demo-status-item").props(f'aria-label="{label}: {detail}"'):
         ui.element("div").classes(f"demo-status-dot {dot_class}")
         ui.label(label).classes("demo-status-item-label")
-        ui.label(short_detail).classes("demo-status-item-detail")
+        ui.label(short_detail).classes("demo-status-item-label")
 
 
 def build_app(
@@ -1474,9 +1485,10 @@ def build_app(
             ui.label("Sample prompt").classes("demo-label")
             with ui.row().classes("w-full gap-2 flex-wrap"):
                 for sample in SAMPLE_PROMPTS:
-                    ui.button(sample, on_click=lambda sample=sample: fill_prompt(sample)).props(
-                        "flat"
-                    ).classes("demo-btn-secondary").style(
+                    ui.button(
+                        sample.label,
+                        on_click=lambda sample=sample: fill_prompt(sample.prompt),
+                    ).props("flat").classes("demo-btn-secondary").style(
                         "--q-primary: var(--color-sample-button-text);"
                     )
 

@@ -10,6 +10,11 @@ def test_readme_documents_eval_command() -> None:
     assert "PYTHONPATH=src uv run python -m openrouter_demo.evals" in Path("README.md").read_text()
 
 
+def test_dockerfile_copies_static_assets() -> None:
+    text = Path("Dockerfile").read_text()
+    assert "COPY assets/ ./assets/" in text
+
+
 def test_failure_tree_and_quickstart_paths_resolve() -> None:
     assert Path("docs/failure-tree.md").exists()
     assert Path("docs/specs/failure-tree.md").exists() is False

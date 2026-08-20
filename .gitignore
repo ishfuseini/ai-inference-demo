@@ -176,12 +176,17 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
-# AI
+# AI / agent tooling
 .DS_Store
 AGENTS.md
+skills-lock.json
+data/skills/
+agent/
 .agents/
 .claude/
 .codex/
+.copilot/
+.cursor/
 .idea/
 .impeccable/
 .kilo/
@@ -189,4 +194,4 @@ AGENTS.md
 .pi/
 .specify/
 .trae/
-agent/
+.windsurf/

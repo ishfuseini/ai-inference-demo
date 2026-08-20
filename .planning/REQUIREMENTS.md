@@ -34,13 +34,13 @@
 
 ### Telemetry, Repeat, and Observability
 
-- [ ] **OBS-01**: App records normalized telemetry for every run, including model/provider, latency, tokens, cost, fallback, cache/repeat, and trace state fields.
-- [ ] **OBS-02**: App opts into OpenRouter router metadata where useful and handles its absence.
-- [ ] **OBS-03**: Repeat/cache scenario reports provider cache metadata only when available.
-- [ ] **OBS-04**: Repeat/cache scenario reports observed repeat latency and cost when cache metadata is unavailable.
-- [ ] **OBS-05**: App creates Langfuse traces for demo calls when Langfuse credentials are configured.
-- [ ] **OBS-06**: App visibly marks tracing disabled when Langfuse credentials are absent.
-- [ ] **OBS-07**: Recent run history allows comparison of completed runs in the main UI.
+- [x] **OBS-01**: App records normalized telemetry for every run, including model/provider, latency, tokens, cost, fallback, cache/repeat, and trace state fields.
+- [x] **OBS-02**: App opts into OpenRouter router metadata where useful and handles its absence.
+- [x] **OBS-03**: Repeat/cache scenario reports provider cache metadata only when available.
+- [x] **OBS-04**: Repeat/cache scenario reports observed repeat latency and cost when cache metadata is unavailable.
+- [x] **OBS-05**: App creates Langfuse traces for demo calls when Langfuse credentials are configured.
+- [x] **OBS-06**: App visibly marks tracing disabled when Langfuse credentials are absent.
+- [x] **OBS-07**: Recent run history allows comparison of completed runs in the main UI.
 
 ### Evals
 
@@ -53,14 +53,14 @@
 
 ### Interview Walkthrough and Quality
 
-- [ ] **DOC-01**: README explains the demo story, setup, env vars, and five-minute walkthrough.
-- [ ] **DOC-02**: Repository includes an architecture guide focused on routing, fallback, latency, cost, telemetry, and eval flow.
-- [ ] **DOC-03**: Repository includes a failure tree covering client, credential, request, provider, routing, timeout, telemetry, and display failures.
-- [ ] **DOC-04**: UI avoids chatbot framing and keeps inference operation as the main product metaphor.
-- [ ] **DOC-05**: Focused tests cover response/error handling, routing configuration, telemetry normalization, and eval scoring.
-- [ ] **DOC-06**: `uv run pytest` passes.
-- [ ] **DOC-07**: `uv run ruff check .` passes.
-- [ ] **DOC-08**: Reviewer can run the core demo with only `OPENROUTER_API_KEY`.
+- [x] **DOC-01**: README explains the demo story, setup, env vars, and five-minute walkthrough.
+- [x] **DOC-02**: Repository includes an architecture guide focused on routing, fallback, latency, cost, telemetry, and eval flow.
+- [x] **DOC-03**: Repository includes a failure tree covering client, credential, request, provider, routing, timeout, telemetry, and display failures.
+- [x] **DOC-04**: UI avoids chatbot framing and keeps inference operation as the main product metaphor.
+- [x] **DOC-05**: Focused tests cover response/error handling, routing configuration, telemetry normalization, and eval scoring.
+- [x] **DOC-06**: `uv run pytest` passes.
+- [x] **DOC-07**: `uv run ruff check .` passes.
+- [x] **DOC-08**: Reviewer can run the core demo with only `OPENROUTER_API_KEY`.
 
 ## v2 Requirements
 
@@ -107,27 +107,27 @@
 | ROUTE-04 | Phase 3 | Complete |
 | ROUTE-05 | Phase 3 | Complete |
 | ROUTE-06 | Phase 3 | Complete |
-| OBS-01 | Phase 4 | Pending |
-| OBS-02 | Phase 4 | Pending |
-| OBS-03 | Phase 4 | Pending |
-| OBS-04 | Phase 4 | Pending |
-| OBS-05 | Phase 4 | Pending |
-| OBS-06 | Phase 4 | Pending |
-| OBS-07 | Phase 4 | Pending |
+| OBS-01 | Phase 4 | Complete |
+| OBS-02 | Phase 4 | Complete |
+| OBS-03 | Phase 4 | Complete |
+| OBS-04 | Phase 4 | Complete |
+| OBS-05 | Phase 4 | Complete |
+| OBS-06 | Phase 4 | Complete |
+| OBS-07 | Phase 4 | Complete |
 | EVAL-01 | Phase 5 | Complete |
 | EVAL-02 | Phase 5 | Complete |
 | EVAL-03 | Phase 5 | Complete |
 | EVAL-04 | Phase 5 | Complete |
 | EVAL-05 | Phase 5 | Complete |
 | EVAL-06 | Phase 5 | Complete |
-| DOC-01 | Phase 6 | Pending |
-| DOC-02 | Phase 6 | Pending |
-| DOC-03 | Phase 6 | Pending |
-| DOC-04 | Phase 6 | Pending |
-| DOC-05 | Phase 6 | Pending |
-| DOC-06 | Phase 6 | Pending |
-| DOC-07 | Phase 6 | Pending |
-| DOC-08 | Phase 6 | Pending |
+| DOC-01 | Phase 6 | Complete |
+| DOC-02 | Phase 6 | Complete |
+| DOC-03 | Phase 6 | Complete |
+| DOC-04 | Phase 6 | Complete |
+| DOC-05 | Phase 6 | Complete |
+| DOC-06 | Phase 6 | Complete |
+| DOC-07 | Phase 6 | Complete |
+| DOC-08 | Phase 6 | Complete |
 
 **Coverage:**
 
@@ -137,4 +137,4 @@
 
 ---
 *Requirements defined: 2026-08-18*
-*Last updated: 2026-08-19 after Phase 2 execution*
+*Last updated: 2026-08-20 after Phase 6 verification*

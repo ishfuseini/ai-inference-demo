@@ -27,7 +27,12 @@ def main() -> None:
             "langfuse_ready": config.langfuse_ready,
         }
 
-    ui.run(title="OpenRouter Production Inference Lab", reload=False)
+    ui.run(
+        title="OpenRouter Production Inference Lab",
+        reload=False,
+        host="0.0.0.0",
+        port=8080,
+    )
 
 
 if __name__ == "__main__":

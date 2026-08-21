@@ -29,12 +29,9 @@ def deserialize_value(value: object) -> object:
 
 
 class Status(StrEnum):
-    PENDING = "pending"
-    STREAMING = "streaming"
     SUCCEEDED = "succeeded"
     FALLBACK_SUCCEEDED = "fallback_succeeded"
     FAILED = "failed"
-    CANCELLED = "cancelled"
 
 
 @dataclass(frozen=True)

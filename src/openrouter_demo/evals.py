@@ -161,6 +161,7 @@ async def run_eval_case(
         trace_status=outcome.status,
         trace_id=outcome.trace_id,
         trace_url=outcome.trace_url,
+        observation_id=outcome.observation_id,
     )
 
     passed, reason, matched, missed, tripped = score_response(case, final_result.text)

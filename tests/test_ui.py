@@ -296,3 +296,84 @@ def test_prompt_panel_does_not_expose_simulated_failure_option() -> None:
 
     assert "Simulate primary route failure" not in text
     assert "simulate_failure" not in text
+
+
+def test_eval_scores_panel_renders_disabled_message() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "Evaluation Scores" in text
+    assert "Langfuse tracing is not configured" in text
+    assert "LANGFUSE_PUBLIC_KEY" in text
+    assert "LANGFUSE_SECRET_KEY" in text
+    assert "LANGFUSE_BASE_URL" in text
+
+
+def test_eval_scores_panel_renders_table_columns() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "demo-scores-table" in text
+    assert "<th>Name</th>" in text
+    assert "<th>Type</th>" in text
+    assert "<th>Value</th>" in text
+    assert "<th>Trace</th>" in text
+    assert "<th>Timestamp</th>" in text
+    assert "score.display_value" in text
+    assert "score.data_type" in text
+    assert "score.trace_id" in text
+
+
+def test_eval_scores_panel_handles_empty_and_failed_states() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "No evaluation scores found yet" in text
+    assert "Failed to fetch scores" in text
+    assert "Waiting for trace scores" in text
+    assert "ui.spinner" in text
+
+
+def test_fetch_scores_handler_guards_and_refreshes() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "async def fetch_scores_handler" in text
+    assert "state.is_fetching_scores" in text
+    assert "fetch_langfuse_scores(" in text
+    assert "observation_id=state.current_observation_id" in text
+    assert "state.scores_fetch_status = status" in text
+    assert "refresh(eval_scores_panel)" in text
+
+
+def test_scores_state_fields_added_to_ui_state() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "is_fetching_scores: bool = False" in text
+    assert "scores: tuple[LangfuseScore, ...] | None = None" in text
+    assert 'scores_fetch_status: str = ""' in text
+    assert "current_trace_id: str | None = None" in text
+    assert "current_observation_id: str | None = None" in text
+
+
+def test_fetch_scores_filters_to_current_observation() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "state.current_observation_id" in text
+    assert "trace_id=state.current_trace_id" in text
+    assert "observation_id=state.current_observation_id" in text
+    assert "state.current_observation_id = run.telemetry.observation_id" in text
+    assert "run.telemetry.observation_id" in text
+
+
+def test_observation_details_fetched_and_rendered() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "fetch_observation_details" in text
+    assert "state.observation_details" in text
+    assert "details.model_name" in text
+    assert "details.latency_ms" in text
+    assert "details.model_parameters" in text
+
+
+def test_refresh_scores_button_removed() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "Refresh Scores" not in text
+    assert "demo-scores-header" not in text

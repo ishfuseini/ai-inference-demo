@@ -73,6 +73,7 @@ class TelemetryEvidence:
     trace_status: str | Unavailable = UNAVAILABLE
     trace_id: str | None = None
     trace_url: str | None = None
+    observation_id: str | None = None
     openrouter_metadata: dict | Unavailable = UNAVAILABLE
 
     def to_dict(self) -> dict:
@@ -90,6 +91,7 @@ class TelemetryEvidence:
             "trace_status": serialize_value(self.trace_status),
             "trace_id": self.trace_id,
             "trace_url": self.trace_url,
+            "observation_id": self.observation_id,
             "openrouter_metadata": serialize_value(self.openrouter_metadata),
         }
 
@@ -109,7 +111,54 @@ class TelemetryEvidence:
             trace_status=deserialize_value(data.get("trace_status")),
             trace_id=data.get("trace_id"),
             trace_url=data.get("trace_url"),
+            observation_id=data.get("observation_id"),
             openrouter_metadata=deserialize_value(data.get("openrouter_metadata")),
+        )
+
+
+@dataclass(frozen=True)
+class LangfuseScore:
+    id: str
+    name: str
+    value: float | bool | str
+    data_type: str  # NUMERIC | BOOLEAN | CATEGORICAL | TEXT | CORRECTION
+    source: str
+    timestamp: str
+    trace_id: str | None = None
+    observation_id: str | None = None
+    comment: str | None = None
+
+    @property
+    def display_value(self) -> str:
+        if self.data_type == "BOOLEAN":
+            return "True" if bool(self.value) else "False"
+        return str(self.value)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "value": serialize_value(self.value),
+            "data_type": self.data_type,
+            "source": self.source,
+            "timestamp": self.timestamp,
+            "trace_id": self.trace_id,
+            "observation_id": self.observation_id,
+            "comment": self.comment,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "LangfuseScore":
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            value=deserialize_value(data["value"]),
+            data_type=data["data_type"],
+            source=data["source"],
+            timestamp=data["timestamp"],
+            trace_id=data.get("trace_id"),
+            observation_id=data.get("observation_id"),
+            comment=data.get("comment"),
         )
 
 

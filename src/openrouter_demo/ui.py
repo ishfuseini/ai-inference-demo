@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -18,6 +19,7 @@ from openrouter_demo.formatting import format_cost, format_trace
 from openrouter_demo.models import (
     UNAVAILABLE,
     InferenceRun,
+    LangfuseScore,
     Status,
     StreamChunk,
     StreamedResult,
@@ -32,7 +34,12 @@ from openrouter_demo.routing import (
     RoutingStrategy,
 )
 from openrouter_demo.sqlite_store import SQLiteRunHistory
-from openrouter_demo.telemetry import record_trace
+from openrouter_demo.telemetry import (
+    ObservationDetails,
+    fetch_langfuse_scores,
+    fetch_observation_details,
+    record_trace,
+)
 
 type StreamFn = Callable[..., AsyncIterator[StreamChunk | StreamedResult]]
 
@@ -417,6 +424,82 @@ body {
 .demo-response-status--error { color: var(--color-error); }
 .demo-response-status--streaming { color: var(--color-accent); }
 
+/* --- Evaluation scores table --- */
+
+.demo-scores-card {
+  display: flex !important;
+  flex-direction: column;
+}
+
+.demo-scores-heading {
+  margin-bottom: var(--space-4);
+}
+
+.demo-score-comment {
+  max-width: 24rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.demo-score-value--pass { color: var(--color-success); font-weight: 600; }
+.demo-score-value--fail { color: var(--color-error); font-weight: 600; }
+
+.demo-scores-empty {
+  font-weight: 400;
+  font-size: var(--text-detail);
+  color: var(--color-text-secondary);
+}
+
+.demo-scores-spinner {
+  color: var(--color-accent);
+}
+
+.demo-scores-meta {
+  font-weight: 400;
+  font-size: var(--text-detail);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-3);
+}
+
+.demo-scores-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+  font-size: var(--text-detail);
+}
+
+.demo-scores-table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 2px solid var(--color-rule-strong);
+}
+
+.demo-scores-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-main);
+  vertical-align: top;
+}
+
+.demo-scores-table td.demo-score-cell--mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+}
+
+.demo-scores-table td.demo-score-cell--truncate {
+  max-width: 16rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* --- Status bar — black instrument strip --- */
 
 .demo-status-bar {
@@ -529,6 +612,16 @@ def _format_cost(value: float | Unavailable) -> str:
     return format_cost(value, unavailable=_COST_UNAVAILABLE_COPY)
 
 
+def _html_escape(value: str) -> str:
+    return (
+        value.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#39;")
+    )
+
+
 def _strategy_with_model(strategy: RoutingStrategy, model_id: str) -> RoutingStrategy:
     return replace(strategy, model=model_id)
 
@@ -586,6 +679,12 @@ class _UIState:
     last_run: InferenceRun | None = None
     response: str = ""
     response_status: str = EMPTY_RESPONSE
+    is_fetching_scores: bool = False
+    scores: tuple[LangfuseScore, ...] | None = None
+    scores_fetch_status: str = ""
+    current_trace_id: str | None = None
+    current_observation_id: str | None = None
+    observation_details: ObservationDetails | None = None
 
 
 async def _run_inference(
@@ -613,6 +712,7 @@ async def _run_inference(
             trace_status: str | Unavailable = UNAVAILABLE
             trace_id: str | None = None
             trace_url: str | None = None
+            observation_id: str | None = None
             if config is not None:
                 model_for_trace = (
                     event.model if not isinstance(event.model, Unavailable) else strategy.model
@@ -633,6 +733,7 @@ async def _run_inference(
                 trace_status = outcome.status
                 trace_id = outcome.trace_id
                 trace_url = outcome.trace_url
+                observation_id = outcome.observation_id
 
             telemetry = TelemetryEvidence(
                 model=event.model,
@@ -649,6 +750,7 @@ async def _run_inference(
                 trace_status=trace_status,
                 trace_id=trace_id,
                 trace_url=trace_url,
+                observation_id=observation_id,
             )
             run = InferenceRun(
                 run_id=uuid.uuid4().hex,
@@ -739,13 +841,123 @@ def build_app(
     def refresh(panel: object) -> None:
         cast(Any, panel).refresh()
 
+    @ui.refreshable
+    def eval_scores_panel() -> None:
+        if not config.langfuse_ready:
+            ui.label(
+                "Langfuse tracing is not configured. Set LANGFUSE_PUBLIC_KEY, "
+                "LANGFUSE_SECRET_KEY, and LANGFUSE_BASE_URL to fetch evaluation scores."
+            ).classes("demo-scores-empty")
+            return
+        if state.is_fetching_scores:
+            with ui.row().classes("items-center gap-2"):
+                ui.spinner(size="1.25rem").classes("demo-scores-spinner")
+                ui.label("Waiting for trace scores…").classes("demo-scores-empty")
+            return
+        if state.scores_fetch_status == "failed":
+            ui.label("Failed to fetch scores.").classes("demo-scores-empty")
+            return
+        if state.scores is None:
+            ui.label("Run inference to load evaluation scores from Langfuse.").classes(
+                "demo-scores-empty"
+            )
+            return
+        if not state.scores:
+            ui.label(
+                "No evaluation scores found yet. Run inference to generate traces, "
+                "then wait for Langfuse evaluator jobs to score them."
+            ).classes("demo-scores-empty")
+            return
+
+        if state.observation_details is not None:
+            details = state.observation_details
+            detail_parts: list[str] = []
+            if details.model_name:
+                detail_parts.append(f"Model: {_html_escape(details.model_name)}")
+            if details.latency_ms is not None:
+                detail_parts.append(f"Latency: {details.latency_ms:.0f} ms")
+            if details.model_parameters:
+                params = ", ".join(f"{k}={v}" for k, v in details.model_parameters.items())
+                detail_parts.append(f"Params: {_html_escape(params)}")
+            if detail_parts:
+                ui.label(" · ".join(detail_parts)).classes("demo-scores-meta")
+
+        rows_html: list[str] = []
+        for score in state.scores:
+            value_class = ""
+            if score.data_type == "BOOLEAN":
+                value_class = (
+                    "demo-score-value--pass" if bool(score.value) else "demo-score-value--fail"
+                )
+            trace_label = f"{score.trace_id[:8]}…" if score.trace_id else "—"
+            trace_title = score.trace_id or ""
+            comment_title = score.comment or ""
+            name_cell = (
+                f'<td class="demo-score-cell--truncate" title="{_html_escape(comment_title)}">'
+                f"{_html_escape(score.name)}</td>"
+            )
+            value_cell = f'<td class="{value_class}">{_html_escape(score.display_value)}</td>'
+            trace_cell = (
+                f'<td class="demo-score-cell--mono" title="{_html_escape(trace_title)}">'
+                f"{_html_escape(trace_label)}</td>"
+            )
+            rows_html.append(
+                "<tr>"
+                + name_cell
+                + f"<td>{_html_escape(score.data_type)}</td>"
+                + value_cell
+                + trace_cell
+                + f'<td class="demo-score-cell--mono">{_html_escape(score.timestamp)}</td>'
+                + "</tr>"
+            )
+
+        table_html = (
+            '<table class="demo-scores-table"><colgroup>'
+            '<col style="width: 30%"><col style="width: 15%"><col style="width: 15%">'
+            '<col style="width: 20%"><col style="width: 20%"></colgroup>'
+            "<thead><tr>"
+            "<th>Name</th><th>Type</th><th>Value</th><th>Trace</th><th>Timestamp</th>"
+            "</tr></thead><tbody>" + "".join(rows_html) + "</tbody></table>"
+        )
+        ui.html(table_html).classes("w-full")
+
+    async def fetch_scores_handler() -> None:
+        if not config.langfuse_ready or state.is_fetching_scores:
+            return
+        state.is_fetching_scores = True
+        refresh(eval_scores_panel)
+        scores: tuple[LangfuseScore, ...] = ()
+        status = "enabled"
+        if state.current_observation_id:
+            prev_count = -1
+            for _ in range(10):
+                outcome = await fetch_langfuse_scores(
+                    config,
+                    limit=50,
+                    trace_id=state.current_trace_id,
+                    observation_id=state.current_observation_id,
+                )
+                status = outcome.status
+                if outcome.status != "enabled":
+                    break
+                scores = outcome.scores or ()
+                if scores and len(scores) == prev_count:
+                    break
+                prev_count = len(scores)
+                await asyncio.sleep(3)
+        state.scores = scores
+        state.scores_fetch_status = status
+        state.observation_details = await fetch_observation_details(
+            config, observation_id=state.current_observation_id or ""
+        )
+        state.is_fetching_scores = False
+        refresh(eval_scores_panel)
+
     async def run_request() -> None:
         if not config.openrouter_ready or state.is_running:
             return
         prompt_text = str(prompt.value or "").strip()
-        selected_strategy = STRATEGIES.get(
-            strategy_select.value, INTELLIGENCE_STRATEGY
-        )
+        selected_strategy = STRATEGIES.get(strategy_select.value, INTELLIGENCE_STRATEGY)
         model_id = STRATEGY_MODELS[selected_strategy.name]
         if not prompt_text or not model_id:
             sync_run_button()
@@ -780,6 +992,9 @@ def build_app(
         )
         state.is_running = False
         state.last_run = run
+        state.current_trace_id = run.telemetry.trace_id if run.telemetry else None
+        state.current_observation_id = run.telemetry.observation_id if run.telemetry else None
+        state.observation_details = None
         state.response = run.streamed_text
         if run.status in (Status.SUCCEEDED, Status.FALLBACK_SUCCEEDED):
             state.response_status = SUCCESS_RESPONSE
@@ -787,6 +1002,7 @@ def build_app(
             state.response_status = FAILURE_RESPONSE
         sync_run_button()
         refresh(response_panel)
+        await fetch_scores_handler()
 
     def fill_prompt(value: str) -> None:
         prompt.value = value
@@ -825,7 +1041,11 @@ def build_app(
         def _status_item(label: str, ready: bool, detail: str) -> None:
             dot_class = "demo-status-dot--ready" if ready else "demo-status-dot--warning"
             short_detail = "Ready" if ready else "Needs setup"
-            with ui.element("div").classes("demo-status-item").props(f'aria-label="{label}: {detail}"'):
+            with (
+                ui.element("div")
+                .classes("demo-status-item")
+                .props(f'aria-label="{label}: {detail}"')
+            ):
                 ui.element("div").classes(f"demo-status-dot {dot_class}")
                 ui.label(label).classes("demo-status-item-label")
                 ui.label(short_detail).classes("demo-status-item-label")
@@ -913,3 +1133,9 @@ def build_app(
 
             with ui.card().classes("flex-1 demo-card demo-response-card"):
                 response_panel()
+
+        with ui.card().classes("w-full demo-card demo-scores-card"):
+            _heading(
+                "Evaluation Scores", level=2, classes="demo-section-heading demo-scores-heading"
+            )
+            eval_scores_panel()

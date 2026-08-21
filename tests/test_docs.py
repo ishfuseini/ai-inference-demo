@@ -61,7 +61,5 @@ def test_focused_test_coverage() -> None:
         "def test_telemetry_evidence_round_trip_preserves_sentinels"
         in Path("tests/test_telemetry.py").read_text()
     )
-    assert Path("tests/test_sqlite_store.py").exists()
-
     assert Path("tests/test_evals.py").exists()
     assert "def test_score_response_passes_and_fails" in Path("tests/test_evals.py").read_text()

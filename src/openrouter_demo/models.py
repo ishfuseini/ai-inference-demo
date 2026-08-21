@@ -157,35 +157,6 @@ class LangfuseScore:
 
 
 @dataclass(frozen=True)
-class AttemptRecord:
-    model: str | Unavailable
-    provider: str | Unavailable
-    status: Status
-    error_message: str | None
-    latency_ms: int
-    prompt_tokens: int | Unavailable
-    completion_tokens: int | Unavailable
-    total_tokens: int | Unavailable
-    cost_usd: float | Unavailable
-
-
-@dataclass(frozen=True)
-class FallbackEvidence:
-    primary: AttemptRecord
-    fallback: AttemptRecord
-    simulated: bool
-
-
-@dataclass(frozen=True)
-class RepeatObservation:
-    first: StreamedResult
-    second: StreamedResult
-    cache_status: str | Unavailable
-    cached_tokens: int | Unavailable
-    cache_write_tokens: int | Unavailable
-
-
-@dataclass(frozen=True)
 class InferenceRun:
     run_id: str
     prompt: str
@@ -196,5 +167,3 @@ class InferenceRun:
     streamed_text: str
     error_message: str | None
     telemetry: TelemetryEvidence | None
-    fallback_evidence: FallbackEvidence | None = None
-    repeat_observation: RepeatObservation | None = None

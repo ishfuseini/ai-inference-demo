@@ -4,6 +4,7 @@ from pathlib import Path
 
 from openrouter_demo.client import OpenRouterHTTPError
 from openrouter_demo.config import load_config
+from openrouter_demo.formatting import format_cost, format_trace
 from openrouter_demo.models import (
     UNAVAILABLE,
     Status,
@@ -20,8 +21,8 @@ from openrouter_demo.ui import (
     EVAL_DESCRIPTION,
     SAMPLE_PROMPTS,
     STRATEGY_MODELS,
-    _format_cost,
-    _format_metadata,
+    _COST_UNAVAILABLE_COPY,
+    _UNAVAILABLE_COPY,
     _run_inference,
     _strategy_with_model,
 )
@@ -89,8 +90,8 @@ def test_run_inference_preserves_unavailable_metadata() -> None:
     assert run.telemetry.provider is UNAVAILABLE
     assert run.telemetry.prompt_tokens is UNAVAILABLE
     assert run.telemetry.cost_usd is UNAVAILABLE
-    assert _format_metadata(UNAVAILABLE) == "Unavailable from selected route/provider."
-    assert _format_cost(UNAVAILABLE) == "Cost metadata was not returned for this route/provider."
+    assert format_trace(UNAVAILABLE, unavailable=_UNAVAILABLE_COPY) == "Unavailable from selected route/provider."
+    assert format_cost(UNAVAILABLE, unavailable=_COST_UNAVAILABLE_COPY) == "Cost metadata was not returned for this route/provider."
 
 
 def test_run_inference_records_partial_text_on_stream_failure() -> None:

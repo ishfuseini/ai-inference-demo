@@ -15,7 +15,6 @@ from starlette.staticfiles import StaticFiles
 
 from openrouter_demo.client import OpenRouterError, stream_chat_completion
 from openrouter_demo.config import OPENROUTER_API_KEY, AppConfig
-from openrouter_demo.formatting import format_cost, format_trace
 from openrouter_demo.models import (
     UNAVAILABLE,
     InferenceRun,
@@ -602,14 +601,6 @@ body {
 }
 </style>
 """
-
-
-def _format_metadata(value: str | Unavailable) -> str:
-    return format_trace(value, unavailable=_UNAVAILABLE_COPY)
-
-
-def _format_cost(value: float | Unavailable) -> str:
-    return format_cost(value, unavailable=_COST_UNAVAILABLE_COPY)
 
 
 def _html_escape(value: str) -> str:

@@ -196,3 +196,12 @@ agent/
 .trae/
 .windsurf/
 .planning
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
+evals/
+superpowers/
+specs/
+data/
+.codacy/
+.vscode/

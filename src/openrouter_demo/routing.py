@@ -26,7 +26,7 @@ DEFAULT_STRATEGY = RoutingStrategy(
 
 COST_STRATEGY = RoutingStrategy(
     name="cost",
-    description="Prefer lower-cost model/provider choices. Validate quality before adopting.",
+    description="Prefer lower-cost model/provider choices.",
     model="openai/gpt-4o-mini",
     provider_preferences={"sort": "price"},
 )

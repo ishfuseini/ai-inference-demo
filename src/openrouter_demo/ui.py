@@ -86,8 +86,8 @@ review, the verdict, DESIGN.md, and every shipping raster carrying its provenanc
   --color-ink: #111111;
   --color-ink-secondary: #555555;
   --color-paper: #F7F7F5;
-  --color-accent: #8A2BE2;
-  --color-accent-hover: #6E21B8;
+  --color-accent: #C495F0;
+  --color-accent-hover: #B690DB;
   --color-accent-subtle: #F1E9FB;
   --color-sample-button: #B3B3B3;
   --color-sample-button-text: #4B4B4B;
@@ -104,7 +104,6 @@ review, the verdict, DESIGN.md, and every shipping raster carrying its provenanc
   --color-surface-alt: var(--color-paper);
   --color-background: var(--color-paper);
   --color-text-on-primary: #FFFFFF;
-  --color-border: var(--color-rule);
   --color-success: #15803D;
   --color-success-bg: #EAF4EC;
   --color-warning: #B45309;
@@ -504,18 +503,21 @@ body {
 
 .demo-status-bar {
   display: flex;
-  align-items: center;
-  gap: var(--space-8);
-  padding: var(--space-3) var(--space-6);
-  border-radius: var(--radius-sm);
-  border: 4px solid var(--color-border-accent);
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: var(--text-body);
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid var(--color-accent) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: var(--space-2) var(--space-4);
 }
 
-.demo-status-item {
-  display: flex;
-  align-items: center;
+.demo-status-bar .q-btn__content {
   gap: var(--space-2);
 }
+
 
 .demo-status-dot {
   width: 8px;
@@ -527,11 +529,7 @@ body {
 .demo-status-dot--ready { background-color: #4ADE80; }
 .demo-status-dot--warning { background-color: #FBBF24; }
 
-.demo-status-item-label {
-  font-weight: 500;
-  font-size: var(--text-detail);
-  color: #8A2BE2;
-}
+
 
 /* --- Section divider --- */
 
@@ -648,8 +646,8 @@ SAMPLE_PROMPTS = (
 )
 
 EVAL_SCENARIO = (
-    "Handling API reliability complaints can be complex and time-consuming. Support teams often struggle to triage issues quickly, draft effective responses, and provide actionable feedback to product teams. This slows down resolution times and impacts customer satisfaction."
-    "Imagine an AI assistant that instantly drafts thoughtful, impact-aware support replies—acknowledging customer pain points without defensiveness, requesting clear diagnostics, and offering honest next steps. Ishlab's demo showcases exactly that, helping support staff move faster and smarter."
+    "Handling API reliability complaints can be complex and time-consuming. Support teams often struggle to triage issues quickly, draft effective responses, and provide actionable feedback to product teams.  \n\n This slows down resolution times and impacts customer satisfaction."
+    "Imagine an AI assistant that instantly drafts thoughtful, impact-aware support replies—acknowledging customer pain points without defensiveness, requesting clear diagnostics, and offering honest next steps. \n\n Ishlab's demo showcases exactly that, helping support staff move faster and smarter."
 )
 
 EVAL_DESCRIPTION = (
@@ -657,12 +655,12 @@ EVAL_DESCRIPTION = (
     "\n"
     "We score whether the reply holds up.\n"
     "\n"
-    "Leads with the customer's problem — names what they actually lost, before any explanation or caveat.\n"
-    "Asks for real detail — request IDs, timestamps, endpoints. Not 'send more info.'\n"
-    "Commits to a next step — what happens, who does it, by when.\n"
-    "Promises only what we can keep — no 'this wont happen again, no unauthorized credits.'\n"
-    "Doesn't guess at blame — no pointing at the customer's code before the evidence is in.\n"
-    "Gets the scope right — doesn't inflate a hiccup into an outage, or wave off a real one.\n"
+    "Leads with the customer's problem — names what they actually lost, before any explanation or caveat.\n\n"
+    "Asks for real detail — request IDs, timestamps, endpoints. Not 'send more info.'\n\n"
+    "Commits to a next step — what happens, who does it, by when.\n\n"
+    "Promises only what we can keep — no 'this wont happen again, no unauthorized credits.'\n\n"
+    "Doesn't guess at blame — no pointing at the customer's code before the evidence is in.\n\n"
+    "Gets the scope right — doesn't inflate a hiccup into an outage, or wave off a real one.\n\n"
     "Answers the churn signal — addresses 'we are evaluating alternatives' directly, without pleading."
 )
 
@@ -1020,40 +1018,44 @@ def build_app(
 
         ui.label(
             "The app runs live streaming inference, exposes routing, cost, latency, token, and trace evidence, and runs a three-to-five-case deterministic eval set. "
-        ).classes("demo-supporting")
+        ).classes("text-body")
         ui.label(
             "This demo shows what changes when inference becomes something you have to operate in production: routing, latency, cost, traces, and evals."
-        ).classes("demo-supporting")
+        ).classes("text-body")
 
         # Request panel with section dividers
         with ui.card().classes("w-full demo-card"):
             _heading(
                 "Prompt routing, traceability, and evaluation come together for meaningful production inference",
                 level=3,
-                classes="text-section-heading",
+                classes="text-xl font-semibold pb-4",
             )
-            _heading("Prompt Evaluation Scenario", level=5, classes="text-section-heading")
-            # ui.html preserves the \n line breaks via whitespace-pre-line
-            ui.html(EVAL_SCENARIO).classes("demo-body").style("white-space: pre-line;")
-            _heading("Prompt Evaluation", level=5, classes="text-section-heading")
-            ui.html(EVAL_DESCRIPTION).classes("demo-body").style("white-space: pre-line;")
+            with ui.splitter() as splitter:
+                with splitter.before:
+                    _heading(
+                        "Prompt Evaluation Scenario", level=5, classes="text-base font-semibold"
+                    )
+                    # ui.html preserves the \n line breaks via whitespace-pre-line
+                    ui.html(EVAL_SCENARIO).classes("pr-6 text-body").style("white-space: pre-line;")
+                with splitter.after:
+                    _heading("Prompt Evaluation", level=5, classes="pl-6 text-base font-semibold")
+                    ui.html(EVAL_DESCRIPTION).classes("pl-6 text-body").style(
+                        "white-space: pre-line;"
+                    )
 
         def _status_item(label: str, ready: bool, detail: str) -> None:
             dot_class = "demo-status-dot--ready" if ready else "demo-status-dot--warning"
-            short_detail = "Ready" if ready else "Needs setup"
-            with (
-                ui.element("div")
-                .classes("demo-status-item")
-                .props(f'aria-label="{label}: {detail}"')
+
+            with ui.button().props("outline").classes("demo-status-bar").props(
+                f'aria-label="{label}: {detail}"'
             ):
-                ui.element("div").classes(f"demo-status-dot {dot_class}")
-                ui.label(label).classes("demo-status-item-label")
-                ui.label(short_detail).classes("demo-status-item-label")
+                ui.element("span").classes(f"demo-status-dot {dot_class}")
+                ui.label(label)
 
         # Compact inline status bar
         with (
             ui.element("div")
-            .classes("demo-status-bar")
+            .classes("w-full flex items-center gap-4 flex-wrap")
             .props('role="status" aria-label="Credential status"')
         ):
             _status_item(

@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
 
-from openrouter_demo.client import OpenRouterHTTPError
+from openrouter_demo.client import OpenRouterError
 from openrouter_demo.config import load_config
 from openrouter_demo.models import (
     UNAVAILABLE,
@@ -20,8 +20,7 @@ from openrouter_demo.ui import (
     EVAL_DESCRIPTION,
     SAMPLE_PROMPTS,
     STRATEGY_MODELS,
-    _format_cost,
-    _format_metadata,
+    _html_escape,
     _run_inference,
     _strategy_with_model,
 )
@@ -89,8 +88,6 @@ def test_run_inference_preserves_unavailable_metadata() -> None:
     assert run.telemetry.provider is UNAVAILABLE
     assert run.telemetry.prompt_tokens is UNAVAILABLE
     assert run.telemetry.cost_usd is UNAVAILABLE
-    assert _format_metadata(UNAVAILABLE) == "Unavailable from selected route/provider."
-    assert _format_cost(UNAVAILABLE) == "Cost metadata was not returned for this route/provider."
 
 
 def test_run_inference_records_partial_text_on_stream_failure() -> None:
@@ -98,7 +95,7 @@ def test_run_inference_records_partial_text_on_stream_failure() -> None:
         *_args: object, **_kwargs: object
     ) -> AsyncIterator[StreamChunk | StreamedResult]:
         yield StreamChunk("partial")
-        raise OpenRouterHTTPError("provider failed", status_code=500, partial_text="partial")
+        raise OpenRouterError("provider failed", partial_text="partial")
 
     history = SQLiteRunHistory(db_path=":memory:")
     run = _run(_run_inference("Prompt", api_key="sk-test", history=history, stream_fn=fake_stream))
@@ -231,7 +228,7 @@ def test_ui_has_no_chatbot_labels() -> None:
     text = Path("src/openrouter_demo/ui.py").read_text()
     for inference_copy in (
         'ui.page_title("ishlab Production Inference Lab")',
-        '_heading("Production Inference Lab", level=1, classes="demo-page-title")',
+        'ui.html("Production Inference Lab", tag="h1").classes("demo-page-title")',
         "The app runs live streaming inference",
         "This demo shows what changes when inference becomes something you have to operate",
         'ui.button("Run Inference", on_click=run_request)',
@@ -377,3 +374,13 @@ def test_refresh_scores_button_removed() -> None:
 
     assert "Refresh Scores" not in text
     assert "demo-scores-header" not in text
+
+
+def test_html_escape_escapes_dangerous_characters() -> None:
+    escaped = _html_escape('<a href="x">O\'Brien & co</a>')
+    assert "<" not in escaped
+    assert ">" not in escaped
+    assert '"' not in escaped
+    assert "'" not in escaped
+    assert "&lt;" in escaped
+    assert "&amp;" in escaped

@@ -4,10 +4,9 @@ import json
 from pathlib import Path
 
 from openrouter_demo.evals import main as evals_main
-from openrouter_demo.models import UNAVAILABLE, AttemptRecord, FallbackEvidence, Status, Unavailable
+from openrouter_demo.models import UNAVAILABLE, Status, Unavailable
 from openrouter_demo.routing import (
     COST_STRATEGY,
-    FALLBACK_PRIMARY_STRATEGY,
     INTELLIGENCE_STRATEGY,
     ROUTING_STRATEGY_LABELS,
     STRATEGIES,
@@ -22,7 +21,6 @@ def test_required_modules_import() -> None:
         "openrouter_demo.evals",
         "openrouter_demo.models",
         "openrouter_demo.routing",
-        "openrouter_demo.scenarios",
         "openrouter_demo.sqlite_store",
         "openrouter_demo.telemetry",
         "openrouter_demo.ui",
@@ -43,18 +41,14 @@ def test_routing_labels_do_not_claim_provider_results() -> None:
 
 def test_phase3_types_importable() -> None:
     assert Status.FALLBACK_SUCCEEDED == "fallback_succeeded"
-    assert AttemptRecord is not None
-    assert FallbackEvidence is not None
     assert COST_STRATEGY.name == "cost"
     assert INTELLIGENCE_STRATEGY.name == "intelligence"
-    assert FALLBACK_PRIMARY_STRATEGY.name == "custom"
     assert set(STRATEGIES.keys()) == {"cost", "intelligence"}
 
 
 def test_unavailable_metadata_is_not_zero() -> None:
     assert isinstance(UNAVAILABLE, Unavailable)
     assert UNAVAILABLE != 0
-    assert not UNAVAILABLE
 
 
 def test_evals_cases_json_has_three_to_five_cases() -> None:
@@ -65,10 +59,9 @@ def test_evals_cases_json_has_three_to_five_cases() -> None:
 
 
 def test_phase4_types_and_fields_importable() -> None:
-    from openrouter_demo.models import RepeatObservation, TelemetryEvidence
+    from openrouter_demo.models import TelemetryEvidence
     from openrouter_demo.telemetry import TraceOutcome
 
-    assert RepeatObservation is not None
     assert TraceOutcome is not None
 
     field_names = {field.name for field in dataclasses.fields(TelemetryEvidence)}

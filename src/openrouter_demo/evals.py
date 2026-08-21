@@ -197,22 +197,6 @@ async def run_eval_set(
     return EvalSummary(tuple(results))
 
 
-def _fmt_cost(value: float | Unavailable | None) -> str:
-    return format_cost(value, unavailable="unavailable")
-
-
-def _fmt_num(value: float | Unavailable | None) -> str:
-    return format_number(value, unavailable="unavailable")
-
-
-def _fmt_latency(value: float | Unavailable | None) -> str:
-    return format_latency(value, unavailable="unavailable")
-
-
-def _fmt_trace(value: str | Unavailable | None) -> str:
-    return format_trace(value, unavailable="unavailable")
-
-
 def _aggregate(results: list[EvalResult]) -> dict[str, object]:
     passed = sum(1 for result in results if result.passed)
     total = len(results)
@@ -285,8 +269,8 @@ def format_summary(summary: EvalSummary, *, as_json: bool = False) -> str:
         agg = _aggregate(results)
         lines.append(
             f"{name}: {agg['passed']}/{agg['total']} passed, "
-            f"cost {_fmt_cost(agg['total_cost'])}, "
-            f"mean latency {_fmt_latency(agg['mean_latency'])}, "
+            f"cost {format_cost(agg['total_cost'], unavailable='unavailable')}, "
+            f"mean latency {format_latency(agg['mean_latency'], unavailable='unavailable')}, "
             f"trace {agg['trace_state']}"
         )
 
@@ -306,10 +290,10 @@ def format_summary(summary: EvalSummary, *, as_json: bool = False) -> str:
             lines.append(
                 f"{result.case_id} {result.strategy_name}: "
                 f"{'pass' if result.passed else 'fail'} — {result.score_reason} | "
-                f"latency {_fmt_latency(result.telemetry.latency_ms)} | "
-                f"tokens {_fmt_num(result.telemetry.total_tokens)} | "
-                f"cost {_fmt_cost(result.telemetry.cost_usd)} | "
-                f"trace {_fmt_trace(result.telemetry.trace_status)}"
+                f"latency {format_latency(result.telemetry.latency_ms, unavailable='unavailable')} | "
+                f"tokens {format_number(result.telemetry.total_tokens, unavailable='unavailable')} | "
+                f"cost {format_cost(result.telemetry.cost_usd, unavailable='unavailable')} | "
+                f"trace {format_trace(result.telemetry.trace_status, unavailable='unavailable')}"
             )
         else:
             lines.append(

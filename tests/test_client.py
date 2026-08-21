@@ -5,7 +5,6 @@ import httpx
 import pytest
 
 from openrouter_demo.client import (
-    OpenRouterAuthError,
     OpenRouterHTTPError,
     stream_chat_completion,
 )
@@ -165,7 +164,7 @@ def test_stream_401_raises_auth_error() -> None:
         ):
             pass
 
-    with pytest.raises(OpenRouterAuthError):
+    with pytest.raises(OpenRouterHTTPError):
         asyncio.run(_run())
 
 

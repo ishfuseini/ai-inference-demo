@@ -98,7 +98,7 @@ def test_run_inference_records_partial_text_on_stream_failure() -> None:
         *_args: object, **_kwargs: object
     ) -> AsyncIterator[StreamChunk | StreamedResult]:
         yield StreamChunk("partial")
-        raise OpenRouterHTTPError("provider failed", status_code=500, partial_text="partial")
+        raise OpenRouterHTTPError("provider failed", partial_text="partial")
 
     history = SQLiteRunHistory(db_path=":memory:")
     run = _run(_run_inference("Prompt", api_key="sk-test", history=history, stream_fn=fake_stream))

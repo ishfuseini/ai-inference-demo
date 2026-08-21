@@ -18,25 +18,7 @@ class OpenRouterError(Exception):
         self.partial_text = partial_text
 
 
-class OpenRouterAuthError(OpenRouterError):
-    pass
-
-
 class OpenRouterHTTPError(OpenRouterError):
-    def __init__(
-        self,
-        message: str,
-        *,
-        status_code: int,
-        partial_text: str = "",
-        error_payload: dict | None = None,
-    ) -> None:
-        super().__init__(message, partial_text=partial_text)
-        self.status_code = status_code
-        self.error_payload = error_payload
-
-
-class OpenRouterTimeoutError(OpenRouterError):
     pass
 
 
@@ -167,14 +149,13 @@ async def stream_chat_completion(
             ) as response:
                 if response.status_code == 401:
                     partial = "".join(text_parts)
-                    raise OpenRouterAuthError(
+                    raise OpenRouterHTTPError(
                         f"OpenRouter auth failed ({response.status_code})", partial_text=partial
                     )
                 if response.status_code >= 400:
                     partial = "".join(text_parts)
                     raise OpenRouterHTTPError(
                         f"OpenRouter request failed ({response.status_code})",
-                        status_code=response.status_code,
                         partial_text=partial,
                     )
 
@@ -196,9 +177,7 @@ async def stream_chat_completion(
                         partial = "".join(text_parts)
                         raise OpenRouterHTTPError(
                             str(msg) if msg else "OpenRouter error",
-                            status_code=response.status_code,
                             partial_text=partial,
-                            error_payload=err_obj,
                         )
 
                     if not isinstance(payload, dict):
@@ -242,13 +221,10 @@ async def stream_chat_completion(
             raise
         except httpx.TimeoutException as exc:
             partial = "".join(text_parts)
-            raise OpenRouterTimeoutError(f"OpenRouter request timed out: {exc}", partial_text=partial) from exc
+            raise OpenRouterHTTPError(f"OpenRouter request timed out: {exc}", partial_text=partial) from exc
         except httpx.HTTPError as exc:
             partial = "".join(text_parts)
-            # already handled status codes above; treat as generic HTTP error, but
-            # surface a status code when one is attached to the underlying response.
-            status_code = exc.response.status_code if exc.response is not None else 0
-            raise OpenRouterHTTPError(str(exc), status_code=status_code, partial_text=partial) from exc
+            raise OpenRouterHTTPError(str(exc), partial_text=partial) from exc
 
         latency_ms = int((time.monotonic() - start) * 1000)
         full_text = "".join(text_parts)

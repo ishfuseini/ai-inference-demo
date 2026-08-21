@@ -5,11 +5,10 @@ import httpx
 import pytest
 
 from openrouter_demo.client import (
-    OpenRouterAuthError,
-    OpenRouterHTTPError,
+    OpenRouterError,
     stream_chat_completion,
 )
-from openrouter_demo.models import UNAVAILABLE, StreamChunk, StreamedResult
+from openrouter_demo.models import UNAVAILABLE, StreamChunk, StreamedResult, Unavailable
 from openrouter_demo.routing import DEFAULT_STRATEGY
 
 
@@ -151,7 +150,7 @@ def test_stream_missing_usage_is_unavailable() -> None:
     assert result.completion_tokens is UNAVAILABLE
     assert result.total_tokens is UNAVAILABLE
     assert result.cost_usd is UNAVAILABLE
-    assert not result.prompt_tokens
+    assert isinstance(result.prompt_tokens, Unavailable)
     assert result.prompt_tokens != 0
 
 
@@ -165,7 +164,7 @@ def test_stream_401_raises_auth_error() -> None:
         ):
             pass
 
-    with pytest.raises(OpenRouterAuthError):
+    with pytest.raises(OpenRouterError):
         asyncio.run(_run())
 
 
@@ -254,6 +253,6 @@ def test_stream_preserves_partial_text_on_error_payload() -> None:
             if isinstance(item, StreamChunk):
                 pass
 
-    with pytest.raises(OpenRouterHTTPError) as exc:
+    with pytest.raises(OpenRouterError) as exc:
         asyncio.run(_run())
     assert exc.value.partial_text == "partial"

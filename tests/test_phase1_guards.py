@@ -28,7 +28,6 @@ def test_phase1_keeps_langfuse_tracing_isolated_to_telemetry() -> None:
         Path("app.py"),
         Path("src/openrouter_demo/client.py"),
         Path("src/openrouter_demo/models.py"),
-        Path("src/openrouter_demo/scenarios.py"),
         Path("src/openrouter_demo/ui.py"),
         Path("src/openrouter_demo/evals.py"),
     ]

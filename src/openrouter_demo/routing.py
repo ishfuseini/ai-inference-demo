@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
-StrategyName = Literal["default", "cost", "intelligence", "custom"]
+StrategyName = Literal["default", "cost", "intelligence"]
 
 ROUTING_STRATEGY_LABELS: dict[StrategyName, str] = {
     "cost": "Cost",
@@ -36,13 +36,6 @@ INTELLIGENCE_STRATEGY = RoutingStrategy(
     description="Prefer stronger models for quality-sensitive responses.",
     model="anthropic/claude-opus-5",
     provider_preferences=None,
-)
-
-FALLBACK_PRIMARY_STRATEGY = RoutingStrategy(
-    name="custom",
-    description="Simulated primary route failure for demo fallback scenario.",
-    model="nonexistent/fake-model-for-demo",
-    provider_preferences={"allow_fallbacks": False},
 )
 
 STRATEGIES: dict[StrategyName, RoutingStrategy] = {

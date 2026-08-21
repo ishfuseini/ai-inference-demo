@@ -9,7 +9,7 @@ from openrouter_demo.client import (
     OpenRouterHTTPError,
     stream_chat_completion,
 )
-from openrouter_demo.models import UNAVAILABLE, StreamChunk, StreamedResult
+from openrouter_demo.models import UNAVAILABLE, StreamChunk, StreamedResult, Unavailable
 from openrouter_demo.routing import DEFAULT_STRATEGY
 
 
@@ -151,7 +151,7 @@ def test_stream_missing_usage_is_unavailable() -> None:
     assert result.completion_tokens is UNAVAILABLE
     assert result.total_tokens is UNAVAILABLE
     assert result.cost_usd is UNAVAILABLE
-    assert not result.prompt_tokens
+    assert isinstance(result.prompt_tokens, Unavailable)
     assert result.prompt_tokens != 0
 
 

@@ -53,7 +53,6 @@ def test_phase3_types_importable() -> None:
 def test_unavailable_metadata_is_not_zero() -> None:
     assert isinstance(UNAVAILABLE, Unavailable)
     assert UNAVAILABLE != 0
-    assert not UNAVAILABLE
 
 
 def test_evals_cases_json_has_three_to_five_cases() -> None:

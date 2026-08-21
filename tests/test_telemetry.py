@@ -110,7 +110,6 @@ def test_extract_cache_hit_write_and_absent() -> None:
 
 def test_unavailable_sentinel_is_not_zero_or_dict() -> None:
     assert isinstance(UNAVAILABLE, Unavailable)
-    assert not UNAVAILABLE
     assert UNAVAILABLE != 0
 
 

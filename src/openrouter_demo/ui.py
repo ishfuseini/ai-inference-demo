@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import os
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -604,13 +605,7 @@ body {
 
 
 def _html_escape(value: str) -> str:
-    return (
-        value.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-        .replace("'", "&#39;")
-    )
+    return html.escape(value)
 
 
 def _strategy_with_model(strategy: RoutingStrategy, model_id: str) -> RoutingStrategy:

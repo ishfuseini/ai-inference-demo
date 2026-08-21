@@ -1097,8 +1097,6 @@ def build_app(
 
                 ui.element("div").classes("demo-section-divider")
 
-                ui.element("div").classes("demo-section-divider")
-
                 with ui.column().classes("gap-1"):
                     run_button = (
                         ui.button("Run Inference", on_click=run_request)

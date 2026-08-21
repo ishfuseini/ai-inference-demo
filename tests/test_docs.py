@@ -52,7 +52,7 @@ def test_focused_test_coverage() -> None:
 
     assert Path("tests/test_routing.py").exists()
     assert (
-        "def test_strategies_dict_contains_three_selectable_strategies"
+        "def test_strategies_dict_contains_two_selectable_strategies"
         in Path("tests/test_routing.py").read_text()
     )
 

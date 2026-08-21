@@ -9,7 +9,6 @@ from openrouter_demo.routing import (
     COST_STRATEGY,
     FALLBACK_PRIMARY_STRATEGY,
     INTELLIGENCE_STRATEGY,
-    LATENCY_STRATEGY,
     ROUTING_STRATEGY_LABELS,
     STRATEGIES,
 )
@@ -38,7 +37,6 @@ def test_live_boundaries_raise_honest_phase_errors() -> None:
 def test_routing_labels_do_not_claim_provider_results() -> None:
     assert ROUTING_STRATEGY_LABELS == {
         "cost": "Cost",
-        "latency": "Latency",
         "intelligence": "Intelligence",
     }
 
@@ -48,10 +46,9 @@ def test_phase3_types_importable() -> None:
     assert AttemptRecord is not None
     assert FallbackEvidence is not None
     assert COST_STRATEGY.name == "cost"
-    assert LATENCY_STRATEGY.name == "latency"
     assert INTELLIGENCE_STRATEGY.name == "intelligence"
     assert FALLBACK_PRIMARY_STRATEGY.name == "custom"
-    assert set(STRATEGIES.keys()) == {"cost", "latency", "intelligence"}
+    assert set(STRATEGIES.keys()) == {"cost", "intelligence"}
 
 
 def test_unavailable_metadata_is_not_zero() -> None:

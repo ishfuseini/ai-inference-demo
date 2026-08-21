@@ -1,11 +1,10 @@
 from dataclasses import dataclass
 from typing import Literal
 
-StrategyName = Literal["default", "cost", "latency", "intelligence", "custom"]
+StrategyName = Literal["default", "cost", "intelligence", "custom"]
 
 ROUTING_STRATEGY_LABELS: dict[StrategyName, str] = {
     "cost": "Cost",
-    "latency": "Latency",
     "intelligence": "Intelligence",
 }
 
@@ -32,13 +31,6 @@ COST_STRATEGY = RoutingStrategy(
     provider_preferences={"sort": "price"},
 )
 
-LATENCY_STRATEGY = RoutingStrategy(
-    name="latency",
-    description="Prefer faster routes for interactive use cases.",
-    model="openai/gpt-4o-mini",
-    provider_preferences={"sort": "latency"},
-)
-
 INTELLIGENCE_STRATEGY = RoutingStrategy(
     name="intelligence",
     description="Prefer stronger models for quality-sensitive responses.",
@@ -55,7 +47,6 @@ FALLBACK_PRIMARY_STRATEGY = RoutingStrategy(
 
 STRATEGIES: dict[StrategyName, RoutingStrategy] = {
     "cost": COST_STRATEGY,
-    "latency": LATENCY_STRATEGY,
     "intelligence": INTELLIGENCE_STRATEGY,
 }
 

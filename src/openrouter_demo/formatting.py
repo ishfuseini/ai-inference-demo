@@ -29,9 +29,8 @@ def format_number(value: float | int | Unavailable | None, *, unavailable: str) 
 
 
 def format_latency(value: float | int | Unavailable | None, *, unavailable: str) -> str:
-    if is_unavailable(value):
-        return unavailable
-    return f"{value:g} ms"
+    formatted = format_number(value, unavailable=unavailable)
+    return formatted if is_unavailable(value) else f"{formatted} ms"
 
 
 def format_trace(value: str | Unavailable | None, *, unavailable: str) -> str:

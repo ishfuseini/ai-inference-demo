@@ -4,7 +4,6 @@ from openrouter_demo.routing import (
     DEFAULT_STRATEGY,
     FALLBACK_PRIMARY_STRATEGY,
     INTELLIGENCE_STRATEGY,
-    LATENCY_STRATEGY,
     STRATEGIES,
     strategy_payload,
 )
@@ -22,12 +21,6 @@ def test_cost_strategy_payload_includes_price_sort() -> None:
     assert payload["provider"] == {"sort": "price"}
 
 
-def test_latency_strategy_payload_includes_latency_sort() -> None:
-    payload = strategy_payload(LATENCY_STRATEGY)
-    assert payload["model"] == "openai/gpt-4o-mini"
-    assert payload["provider"] == {"sort": "latency"}
-
-
 def test_intelligence_strategy_payload_has_no_provider_sort() -> None:
     payload = strategy_payload(INTELLIGENCE_STRATEGY)
     assert payload == {"model": "anthropic/claude-opus-5"}
@@ -39,10 +32,9 @@ def test_fallback_primary_strategy_payload_includes_allow_fallbacks_false() -> N
     assert payload["provider"] == {"allow_fallbacks": False}
 
 
-def test_strategies_dict_contains_three_selectable_strategies() -> None:
-    assert set(STRATEGIES.keys()) == {"cost", "latency", "intelligence"}
+def test_strategies_dict_contains_two_selectable_strategies() -> None:
+    assert set(STRATEGIES.keys()) == {"cost", "intelligence"}
     assert STRATEGIES["cost"] is COST_STRATEGY
-    assert STRATEGIES["latency"] is LATENCY_STRATEGY
     assert STRATEGIES["intelligence"] is INTELLIGENCE_STRATEGY
 
 

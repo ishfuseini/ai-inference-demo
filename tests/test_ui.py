@@ -1,43 +1,29 @@
 import asyncio
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
 from pathlib import Path
 
 from openrouter_demo.client import OpenRouterHTTPError
 from openrouter_demo.config import load_config
-from openrouter_demo.sqlite_store import SQLiteRunHistory
 from openrouter_demo.models import (
     UNAVAILABLE,
-    AttemptRecord,
-    FallbackEvidence,
-    InferenceRun,
     Status,
     StreamChunk,
     StreamedResult,
-    TelemetryEvidence,
 )
 from openrouter_demo.routing import (
     COST_STRATEGY,
     DEFAULT_STRATEGY,
-    LATENCY_STRATEGY,
     STRATEGIES,
 )
+from openrouter_demo.sqlite_store import SQLiteRunHistory
 from openrouter_demo.ui import (
     EVAL_DESCRIPTION,
-    EVAL_SCORING_ROWS,
     SAMPLE_PROMPTS,
-    STRATEGY_MODEL_OPTIONS,
-    STREAMING_RESPONSE,
-    SUCCESS_RESPONSE,
-    _comparison_rows,
+    STRATEGY_MODELS,
     _format_cost,
     _format_metadata,
-    _history_rows,
-    _history_trace_href,
-    _run_fallback_inference,
     _run_inference,
     _strategy_with_model,
-    _telemetry_rows,
 )
 
 
@@ -138,77 +124,6 @@ def test_run_inference_rejects_blank_prompt() -> None:
         raise AssertionError("blank prompt was accepted")
 
 
-def test_telemetry_and_history_rows_render_unavailable_copy() -> None:
-    run = InferenceRun(
-        run_id="run-1",
-        prompt="Prompt",
-        strategy_name=DEFAULT_STRATEGY.name,
-        started_at=datetime.now(UTC),
-        completed_at=datetime.now(UTC),
-        status=Status.SUCCEEDED,
-        streamed_text="done",
-        error_message=None,
-        telemetry=TelemetryEvidence(
-            model=UNAVAILABLE,
-            provider=UNAVAILABLE,
-            latency_ms=15,
-            prompt_tokens=UNAVAILABLE,
-            completion_tokens=UNAVAILABLE,
-            total_tokens=UNAVAILABLE,
-            cost_usd=UNAVAILABLE,
-        ),
-    )
-    history = SQLiteRunHistory(db_path=":memory:")
-    history.append(run)
-
-    telemetry = dict(_telemetry_rows(run))
-    assert telemetry["Model"] == "Unavailable from selected route/provider."
-    assert telemetry["Provider"] == "Unavailable from selected route/provider."
-    assert telemetry["Tokens"] == "Unavailable from selected route/provider."
-    assert telemetry["Cost"] == "Cost metadata was not returned for this route/provider."
-    assert _history_rows(history)[0][2:] == (
-        "Unavailable from selected route/provider.",
-        "Unavailable from selected route/provider.",
-        "15 ms",
-        "Unavailable from selected route/provider.",
-        "Cost metadata was not returned for this route/provider.",
-        "Unavailable from selected route/provider.",
-    )
-
-
-def test_telemetry_rows_reflect_run_strategy() -> None:
-    run = InferenceRun(
-        run_id="run-strategy",
-        prompt="Prompt",
-        strategy_name="cost",
-        started_at=datetime.now(UTC),
-        completed_at=datetime.now(UTC),
-        status=Status.SUCCEEDED,
-        streamed_text="done",
-        error_message=None,
-        telemetry=None,
-    )
-
-    telemetry = dict(_telemetry_rows(run))
-    assert telemetry["Strategy"] == "cost"
-
-    idle = dict(_telemetry_rows(None))
-    assert idle["Strategy"] == "Waiting"
-    assert idle["Model"] == "Waiting"
-    assert idle["Provider"] == "Waiting"
-    assert idle["Latency"] == "Waiting"
-    assert idle["Tokens"] == "Waiting"
-    assert idle["Cost"] == "Waiting"
-    assert idle["Router"] == "Waiting"
-    assert idle["Trace"] == "Waiting"
-
-
-def test_telemetry_rows_streaming_state_copy() -> None:
-    rows = dict(_telemetry_rows(None, is_running=True))
-    assert rows["Status"] == STREAMING_RESPONSE
-    assert rows["Latency"] == "Latency was not returned for this route/provider."
-
-
 def test_run_inference_records_cost_strategy_name() -> None:
     async def fake_stream(
         *_args: object, **_kwargs: object
@@ -236,35 +151,8 @@ def test_run_inference_records_cost_strategy_name() -> None:
     assert run.strategy_name == "cost"
 
 
-def test_run_inference_records_latency_strategy_name() -> None:
-    async def fake_stream(
-        *_args: object, **_kwargs: object
-    ) -> AsyncIterator[StreamChunk | StreamedResult]:
-        yield StreamedResult(
-            text="done",
-            model="openai/gpt-4o-mini",
-            provider="OpenAI",
-            prompt_tokens=3,
-            completion_tokens=4,
-            total_tokens=7,
-            cost_usd=0.001,
-            latency_ms=100,
-        )
-
-    run = _run(
-        _run_inference(
-            "Prompt",
-            api_key="sk-test",
-            history=SQLiteRunHistory(db_path=":memory:"),
-            stream_fn=fake_stream,
-            strategy=LATENCY_STRATEGY,
-        )
-    )
-    assert run.strategy_name == "latency"
-
-
-def test_strategies_dict_contains_three_selectable_strategies() -> None:
-    assert set(STRATEGIES.keys()) == {"cost", "latency", "intelligence"}
+def test_strategies_dict_contains_two_selectable_strategies() -> None:
+    assert set(STRATEGIES.keys()) == {"cost", "intelligence"}
 
 
 def test_strategy_with_model_preserves_routing_preferences() -> None:
@@ -277,247 +165,12 @@ def test_strategy_with_model_preserves_routing_preferences() -> None:
     assert COST_STRATEGY.model == DEFAULT_STRATEGY.model
 
 
-def test_strategy_model_options_are_hard_coded_by_strategy() -> None:
-    assert STRATEGY_MODEL_OPTIONS == {
-        "cost": {
-            "nvidia/nemotron-3.5-lightning:free": "nvidia/nemotron-3.5-lightning:free",
-            "google/gemma-4-31b-it:free": "google/gemma-4-31b-it:free",
-            "openai/gpt-oss-20b:free": "openai/gpt-oss-20b:free",
-        },
-        "latency": {
-            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": (
-                "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
-            ),
-            "poolside/laguna-xs-2.1:free": "poolside/laguna-xs-2.1:free",
-            "google/gemma-4-26b-a4b-it:free": "google/gemma-4-26b-a4b-it:free",
-        },
-        "intelligence": {
-            "anthropic/claude-opus-5": "anthropic/claude-opus-5",
-            "openai/gpt-5.6-sol": "openai/gpt-5.6-sol",
-            "moonshotai/kimi-k3": "moonshotai/kimi-k3",
-        },
+def test_strategy_models_are_hard_coded_by_strategy() -> None:
+    assert STRATEGY_MODELS == {
+        "cost": "openai/gpt-oss-20b:free",
+        "intelligence": "anthropic/claude-opus-5",
     }
-    assert set(STRATEGY_MODEL_OPTIONS) == set(STRATEGIES)
-    assert all(len(options) == 3 for options in STRATEGY_MODEL_OPTIONS.values())
-    assert all(label == model_id for options in STRATEGY_MODEL_OPTIONS.values() for model_id, label in options.items())
-
-
-def test_history_rows_show_trace_without_fallback_or_cache_columns() -> None:
-    run = InferenceRun(
-        run_id="run-1",
-        prompt="Prompt",
-        strategy_name=DEFAULT_STRATEGY.name,
-        started_at=datetime.now(UTC),
-        completed_at=datetime.now(UTC),
-        status=Status.SUCCEEDED,
-        streamed_text="done",
-        error_message=None,
-        telemetry=TelemetryEvidence(
-            model="openai/gpt-4o-mini",
-            provider="OpenAI",
-            latency_ms=200,
-            prompt_tokens=3,
-            completion_tokens=4,
-            total_tokens=7,
-            cost_usd=0.001,
-        ),
-    )
-    history = SQLiteRunHistory(db_path=":memory:")
-    history.append(run)
-
-    rows = _history_rows(history)
-    assert len(rows[0]) == 8
-    assert rows[0][-1] == "Unavailable from selected route/provider."
-
-    primary = AttemptRecord(
-        model="nonexistent/fake-model-for-demo",
-        provider=UNAVAILABLE,
-        status=Status.FAILED,
-        error_message="OpenRouter request failed (404)",
-        latency_ms=12,
-        prompt_tokens=UNAVAILABLE,
-        completion_tokens=UNAVAILABLE,
-        total_tokens=UNAVAILABLE,
-        cost_usd=UNAVAILABLE,
-    )
-    fallback = AttemptRecord(
-        model="openai/gpt-4o-mini",
-        provider="OpenAI",
-        status=Status.SUCCEEDED,
-        error_message=None,
-        latency_ms=200,
-        prompt_tokens=3,
-        completion_tokens=4,
-        total_tokens=7,
-        cost_usd=0.001,
-    )
-    fallback_run = InferenceRun(
-        run_id="run-2",
-        prompt="Prompt",
-        strategy_name=DEFAULT_STRATEGY.name,
-        started_at=datetime.now(UTC),
-        completed_at=datetime.now(UTC),
-        status=Status.FALLBACK_SUCCEEDED,
-        streamed_text="Fallback response",
-        error_message=None,
-        telemetry=TelemetryEvidence(
-            model="openai/gpt-4o-mini",
-            provider="OpenAI",
-            latency_ms=200,
-            prompt_tokens=3,
-            completion_tokens=4,
-            total_tokens=7,
-            cost_usd=0.001,
-        ),
-        fallback_evidence=FallbackEvidence(primary=primary, fallback=fallback, simulated=True),
-    )
-    history.append(fallback_run)
-    rows = _history_rows(history)
-    assert len(rows[1]) == 8
-    assert "Yes" not in rows[1]
-
-
-def test_telemetry_rows_fallback_success_status() -> None:
-    primary = AttemptRecord(
-        model="nonexistent/fake-model-for-demo",
-        provider=UNAVAILABLE,
-        status=Status.FAILED,
-        error_message="OpenRouter request failed (404)",
-        latency_ms=12,
-        prompt_tokens=UNAVAILABLE,
-        completion_tokens=UNAVAILABLE,
-        total_tokens=UNAVAILABLE,
-        cost_usd=UNAVAILABLE,
-    )
-    fallback = AttemptRecord(
-        model="openai/gpt-4o-mini",
-        provider="OpenAI",
-        status=Status.SUCCEEDED,
-        error_message=None,
-        latency_ms=200,
-        prompt_tokens=3,
-        completion_tokens=4,
-        total_tokens=7,
-        cost_usd=0.001,
-    )
-    run = InferenceRun(
-        run_id="run-fb",
-        prompt="Prompt",
-        strategy_name=DEFAULT_STRATEGY.name,
-        started_at=datetime.now(UTC),
-        completed_at=datetime.now(UTC),
-        status=Status.FALLBACK_SUCCEEDED,
-        streamed_text="Fallback response",
-        error_message=None,
-        telemetry=TelemetryEvidence(
-            model="openai/gpt-4o-mini",
-            provider="OpenAI",
-            latency_ms=200,
-            prompt_tokens=3,
-            completion_tokens=4,
-            total_tokens=7,
-            cost_usd=0.001,
-        ),
-        fallback_evidence=FallbackEvidence(primary=primary, fallback=fallback, simulated=True),
-    )
-
-    rows = dict(_telemetry_rows(run))
-    assert rows["Status"] == SUCCESS_RESPONSE
-
-
-def test_run_fallback_inference_produces_fallback_succeeded_run() -> None:
-    call_count = 0
-
-    async def dual_stream(
-        *_args: object, **_kwargs: object
-    ) -> AsyncIterator[StreamChunk | StreamedResult]:
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            raise OpenRouterHTTPError(
-                "OpenRouter request failed (404)", status_code=404, partial_text=""
-            )
-        yield StreamChunk("Fallback ")
-        yield StreamChunk("response")
-        yield StreamedResult(
-            text="Fallback response",
-            model="openai/gpt-4o-mini",
-            provider="OpenAI",
-            prompt_tokens=3,
-            completion_tokens=4,
-            total_tokens=7,
-            cost_usd=0.001,
-            latency_ms=200,
-        )
-
-    run = _run(
-        _run_fallback_inference(
-            "test",
-            api_key="sk-test",
-            history=SQLiteRunHistory(db_path=":memory:"),
-            fallback_strategy=DEFAULT_STRATEGY,
-            stream_fn=dual_stream,
-        )
-    )
-
-    assert run.status is Status.FALLBACK_SUCCEEDED
-    assert run.fallback_evidence is not None
-    assert run.fallback_evidence.primary.status is Status.FAILED
-    assert run.fallback_evidence.fallback.status is Status.SUCCEEDED
-    assert run.streamed_text == "Fallback response"
-    assert run.telemetry is not None
-    assert run.telemetry.model == "openai/gpt-4o-mini"
-    assert run.telemetry.provider == "OpenAI"
-
-
-def test_telemetry_rows_render_fallback_evidence() -> None:
-    primary = AttemptRecord(
-        model="nonexistent/fake-model-for-demo",
-        provider=UNAVAILABLE,
-        status=Status.FAILED,
-        error_message="OpenRouter request failed (404)",
-        latency_ms=12,
-        prompt_tokens=UNAVAILABLE,
-        completion_tokens=UNAVAILABLE,
-        total_tokens=UNAVAILABLE,
-        cost_usd=UNAVAILABLE,
-    )
-    fallback = AttemptRecord(
-        model="openai/gpt-4o-mini",
-        provider="OpenAI",
-        status=Status.SUCCEEDED,
-        error_message=None,
-        latency_ms=200,
-        prompt_tokens=3,
-        completion_tokens=4,
-        total_tokens=7,
-        cost_usd=0.001,
-    )
-    run = InferenceRun(
-        run_id="run-fb-evidence",
-        prompt="Prompt",
-        strategy_name=DEFAULT_STRATEGY.name,
-        started_at=datetime.now(UTC),
-        completed_at=datetime.now(UTC),
-        status=Status.FALLBACK_SUCCEEDED,
-        streamed_text="Fallback response",
-        error_message=None,
-        telemetry=TelemetryEvidence(
-            model="openai/gpt-4o-mini",
-            provider="OpenAI",
-            latency_ms=200,
-            prompt_tokens=3,
-            completion_tokens=4,
-            total_tokens=7,
-            cost_usd=0.001,
-        ),
-        fallback_evidence=FallbackEvidence(primary=primary, fallback=fallback, simulated=True),
-    )
-
-    rows = dict(_telemetry_rows(run))
-    assert rows["Status"] == SUCCESS_RESPONSE
-    assert "Primary status" not in rows
-    assert "Fallback model" not in rows
+    assert set(STRATEGY_MODELS) == set(STRATEGIES)
 
 
 def test_run_inference_without_config_skips_tracing() -> None:
@@ -574,209 +227,6 @@ def test_run_inference_with_langfuse_disabled_config_records_trace_status() -> N
     assert run.telemetry.trace_id is None
 
 
-def _fallback_stream_for_ui_test() -> object:
-    call_count = 0
-
-    async def dual_stream(
-        *_args: object, **_kwargs: object
-    ) -> AsyncIterator[StreamChunk | StreamedResult]:
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            raise OpenRouterHTTPError(
-                "OpenRouter request failed (404)", status_code=404, partial_text=""
-            )
-        yield StreamChunk("Fallback ")
-        yield StreamedResult(
-            text="Fallback response",
-            model="openai/gpt-4o-mini",
-            provider="OpenAI",
-            prompt_tokens=3,
-            completion_tokens=4,
-            total_tokens=7,
-            cost_usd=0.001,
-            latency_ms=200,
-        )
-
-    return dual_stream
-
-
-def test_run_fallback_inference_without_config_skips_tracing() -> None:
-    run = _run(
-        _run_fallback_inference(
-            "test",
-            api_key="sk-test",
-            history=SQLiteRunHistory(db_path=":memory:"),
-            fallback_strategy=DEFAULT_STRATEGY,
-            stream_fn=_fallback_stream_for_ui_test(),
-        )
-    )
-    assert run.status is Status.FALLBACK_SUCCEEDED
-    assert run.telemetry is not None
-    assert run.telemetry.trace_status is UNAVAILABLE
-    assert run.telemetry.trace_id is None
-
-
-def test_run_fallback_inference_with_langfuse_disabled_config_records_trace_status() -> None:
-    run = _run(
-        _run_fallback_inference(
-            "test",
-            api_key="sk-test",
-            history=SQLiteRunHistory(db_path=":memory:"),
-            fallback_strategy=DEFAULT_STRATEGY,
-            stream_fn=_fallback_stream_for_ui_test(),
-            config=load_config({}),
-        )
-    )
-    assert run.status is Status.FALLBACK_SUCCEEDED
-    assert run.telemetry is not None
-    assert run.telemetry.trace_status == "disabled"
-    assert run.telemetry.trace_id is None
-
-
-def test_history_rows_render_trace_status_and_link_target() -> None:
-    run = InferenceRun(
-        run_id="run-cache-trace",
-        prompt="Prompt",
-        strategy_name=DEFAULT_STRATEGY.name,
-        started_at=datetime.now(UTC),
-        completed_at=datetime.now(UTC),
-        status=Status.SUCCEEDED,
-        streamed_text="done",
-        error_message=None,
-        telemetry=TelemetryEvidence(
-            model="openai/gpt-4o-mini",
-            provider="OpenAI",
-            latency_ms=200,
-            prompt_tokens=3,
-            completion_tokens=4,
-            total_tokens=7,
-            cost_usd=0.001,
-            trace_status="enabled",
-            trace_id="abc123",
-            trace_url="https://cloud.langfuse.com/traces/abc123",
-        ),
-    )
-    history = SQLiteRunHistory(db_path=":memory:")
-    history.append(run)
-    rows = _history_rows(history)
-    assert len(rows[0]) == 8
-    assert rows[0][-1] == "https://cloud.langfuse.com/traces/abc123"
-    assert _history_trace_href(run) == "https://cloud.langfuse.com/traces/abc123"
-
-
-def test_comparison_rows_include_completed_runs() -> None:
-    def _run(model: str, status: Status, completed: bool = True) -> InferenceRun:
-        return InferenceRun(
-            run_id=f"run-{model}",
-            prompt="Prompt",
-            strategy_name=DEFAULT_STRATEGY.name,
-            started_at=datetime.now(UTC),
-            completed_at=datetime.now(UTC) if completed else None,
-            status=status,
-            streamed_text="done",
-            error_message=None,
-            telemetry=TelemetryEvidence(
-                model=model,
-                provider="OpenAI",
-                latency_ms=200,
-                prompt_tokens=3,
-                completion_tokens=4,
-                total_tokens=7,
-                cost_usd=0.001,
-            ),
-        )
-
-    history = SQLiteRunHistory(db_path=":memory:")
-    history.append(_run("openai/gpt-4o-mini", Status.SUCCEEDED))
-    history.append(_run("openai/gpt-4o-mini-extra", Status.SUCCEEDED))
-    history.append(_run("failed-model", Status.FAILED))
-    history.append(_run("pending-model", Status.PENDING, completed=False))
-
-    rows_all = _comparison_rows(history)
-    models_all = [row[1] for row in rows_all]
-    assert len(rows_all) >= 2
-    assert rows_all[0][0] == "1"
-    assert rows_all[1][0] == "2"
-    assert "openai/gpt-4o-mini" in models_all
-    assert "openai/gpt-4o-mini-extra" in models_all
-    assert "failed-model" not in models_all
-    assert "pending-model" not in models_all
-
-    rows_limited = _comparison_rows(history, limit=1)
-    assert len(rows_limited) == 1
-
-    # Trace labels in comparison rows must match history rows; trace URL also powers run links.
-    trace_run = InferenceRun(
-        run_id="run-compare-trace",
-        prompt="Prompt trace",
-        strategy_name=DEFAULT_STRATEGY.name,
-        started_at=datetime.now(UTC),
-        completed_at=datetime.now(UTC),
-        status=Status.SUCCEEDED,
-        streamed_text="trace done",
-        error_message=None,
-        telemetry=TelemetryEvidence(
-            model="openai/gpt-4o-mini-trace",
-            provider="OpenAI",
-            latency_ms=250,
-            prompt_tokens=4,
-            completion_tokens=5,
-            total_tokens=9,
-            cost_usd=0.0015,
-            trace_status="enabled",
-            trace_id="abc123",
-            trace_url="https://cloud.langfuse.com/traces/abc123",
-        ),
-    )
-    trace_history = SQLiteRunHistory(db_path=":memory:")
-    trace_history.append(trace_run)
-
-    history_rows = _history_rows(trace_history)
-    comparison_rows = _comparison_rows(trace_history)
-    assert len(history_rows) == 1
-    assert len(comparison_rows) == 1
-    assert comparison_rows[0][-1] == history_rows[0][-1]
-    assert comparison_rows[0][-1] == "https://cloud.langfuse.com/traces/abc123"
-    assert _history_trace_href(trace_run) == "https://cloud.langfuse.com/traces/abc123"
-
-
-def test_run_fallback_inference_appends_to_history() -> None:
-    call_count = 0
-
-    async def dual_stream(
-        *_args: object, **_kwargs: object
-    ) -> AsyncIterator[StreamChunk | StreamedResult]:
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            raise OpenRouterHTTPError(
-                "OpenRouter request failed (404)", status_code=404, partial_text=""
-            )
-        yield StreamedResult(
-            text="Fallback response",
-            model="openai/gpt-4o-mini",
-            provider="OpenAI",
-            prompt_tokens=3,
-            completion_tokens=4,
-            total_tokens=7,
-            cost_usd=0.001,
-            latency_ms=200,
-        )
-
-    history = SQLiteRunHistory(db_path=":memory:")
-    run = _run(
-        _run_fallback_inference(
-            "test",
-            api_key="sk-test",
-            history=history,
-            fallback_strategy=DEFAULT_STRATEGY,
-            stream_fn=dual_stream,
-        )
-    )
-    assert history.all() == [run]
-
-
 def test_ui_has_no_chatbot_labels() -> None:
     text = Path("src/openrouter_demo/ui.py").read_text()
     for inference_copy in (
@@ -786,14 +236,11 @@ def test_ui_has_no_chatbot_labels() -> None:
         "This demo shows what changes when inference becomes something you have to operate",
         'ui.button("Run Inference", on_click=run_request)',
         '"LLM Response"',
-        '"Model"',
-        '"Choose one of the three hard-coded models for the selected strategy."',
+        '"Strategy"',
+        'STRATEGY_MODEL_SHORT_NAMES[STRATEGY_MODELS[s.name]]',
         "demo-prompt-card",
         "rows=18",
         "demo-response-output",
-        '"Telemetry"',
-        '"Run history"',
-        '"Comparison"',
     ):
         assert inference_copy in text
     for forbidden in (
@@ -821,19 +268,11 @@ def test_sample_prompt_buttons_have_short_labels_and_full_prompts() -> None:
 
 
 def test_prompt_panel_describes_eval_rubric() -> None:
-    text = Path("src/openrouter_demo/ui.py").read_text()
-
-    assert "ui.html(EVAL_DESCRIPTION)" in text
-    assert "_render_eval_scoring_table()" in text
+    assert "ui.html(EVAL_DESCRIPTION)" in Path("src/openrouter_demo/ui.py").read_text()
     assert "API keeps failing" in EVAL_DESCRIPTION
     assert "Leads with the customer's problem" in EVAL_DESCRIPTION
     assert "Asks for real detail" in EVAL_DESCRIPTION
     assert "Commits to a next step" in EVAL_DESCRIPTION
-    assert any("ACK, NODEF, DIAG, NEXT" in row[1] for row in EVAL_SCORING_ROWS)
-    assert any(row[0] == "Tone score" for row in EVAL_SCORING_ROWS)
-    assert any(row[0] == "Auto-fail" for row in EVAL_SCORING_ROWS)
-    assert "classification task" not in text
-    assert "summarization task" not in text
 
 
 def test_run_button_initial_disabled_state_uses_nicegui_api() -> None:
@@ -857,3 +296,84 @@ def test_prompt_panel_does_not_expose_simulated_failure_option() -> None:
 
     assert "Simulate primary route failure" not in text
     assert "simulate_failure" not in text
+
+
+def test_eval_scores_panel_renders_disabled_message() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "Evaluation Scores" in text
+    assert "Langfuse tracing is not configured" in text
+    assert "LANGFUSE_PUBLIC_KEY" in text
+    assert "LANGFUSE_SECRET_KEY" in text
+    assert "LANGFUSE_BASE_URL" in text
+
+
+def test_eval_scores_panel_renders_table_columns() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "demo-scores-table" in text
+    assert "<th>Name</th>" in text
+    assert "<th>Type</th>" in text
+    assert "<th>Value</th>" in text
+    assert "<th>Trace</th>" in text
+    assert "<th>Timestamp</th>" in text
+    assert "score.display_value" in text
+    assert "score.data_type" in text
+    assert "score.trace_id" in text
+
+
+def test_eval_scores_panel_handles_empty_and_failed_states() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "No evaluation scores found yet" in text
+    assert "Failed to fetch scores" in text
+    assert "Waiting for trace scores" in text
+    assert "ui.spinner" in text
+
+
+def test_fetch_scores_handler_guards_and_refreshes() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "async def fetch_scores_handler" in text
+    assert "state.is_fetching_scores" in text
+    assert "fetch_langfuse_scores(" in text
+    assert "observation_id=state.current_observation_id" in text
+    assert "state.scores_fetch_status = status" in text
+    assert "refresh(eval_scores_panel)" in text
+
+
+def test_scores_state_fields_added_to_ui_state() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "is_fetching_scores: bool = False" in text
+    assert "scores: tuple[LangfuseScore, ...] | None = None" in text
+    assert 'scores_fetch_status: str = ""' in text
+    assert "current_trace_id: str | None = None" in text
+    assert "current_observation_id: str | None = None" in text
+
+
+def test_fetch_scores_filters_to_current_observation() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "state.current_observation_id" in text
+    assert "trace_id=state.current_trace_id" in text
+    assert "observation_id=state.current_observation_id" in text
+    assert "state.current_observation_id = run.telemetry.observation_id" in text
+    assert "run.telemetry.observation_id" in text
+
+
+def test_observation_details_fetched_and_rendered() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "fetch_observation_details" in text
+    assert "state.observation_details" in text
+    assert "details.model_name" in text
+    assert "details.latency_ms" in text
+    assert "details.model_parameters" in text
+
+
+def test_refresh_scores_button_removed() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "Refresh Scores" not in text
+    assert "demo-scores-header" not in text

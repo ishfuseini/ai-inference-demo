@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -13,11 +14,12 @@ from nicegui import ui
 from starlette.staticfiles import StaticFiles
 
 from openrouter_demo.client import OpenRouterError, stream_chat_completion
-from openrouter_demo.formatting import format_cost, format_latency, format_number, format_trace
 from openrouter_demo.config import OPENROUTER_API_KEY, AppConfig
+from openrouter_demo.formatting import format_cost, format_trace
 from openrouter_demo.models import (
     UNAVAILABLE,
     InferenceRun,
+    LangfuseScore,
     Status,
     StreamChunk,
     StreamedResult,
@@ -32,7 +34,12 @@ from openrouter_demo.routing import (
     RoutingStrategy,
 )
 from openrouter_demo.sqlite_store import SQLiteRunHistory
-from openrouter_demo.telemetry import record_trace
+from openrouter_demo.telemetry import (
+    ObservationDetails,
+    fetch_langfuse_scores,
+    fetch_observation_details,
+    record_trace,
+)
 
 type StreamFn = Callable[..., AsyncIterator[StreamChunk | StreamedResult]]
 
@@ -40,24 +47,15 @@ type StreamFn = Callable[..., AsyncIterator[StreamChunk | StreamedResult]]
 _UNAVAILABLE_COPY = "Unavailable from selected route/provider."
 _COST_UNAVAILABLE_COPY = "Cost metadata was not returned for this route/provider."
 _LATENCY_UNAVAILABLE_COPY = "Latency was not returned for this route/provider."
-_WAITING_COPY = "Waiting"
 
-STRATEGY_MODEL_OPTIONS: dict[str, tuple[str, ...]] = {
-    "cost": (
-        "nvidia/nemotron-3.5-lightning:free",
-        "google/gemma-4-31b-it:free",
-        "openai/gpt-oss-20b:free",
-    ),
-    "latency": (
-        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-        "poolside/laguna-xs-2.1:free",
-        "google/gemma-4-26b-a4b-it:free",
-    ),
-    "intelligence": (
-        "anthropic/claude-opus-5",
-        "openai/gpt-5.6-sol",
-        "moonshotai/kimi-k3",
-    ),
+STRATEGY_MODELS: dict[str, str] = {
+    "cost": "openai/gpt-oss-20b:free",
+    "intelligence": "anthropic/claude-opus-5",
+}
+
+STRATEGY_MODEL_SHORT_NAMES: dict[str, str] = {
+    "openai/gpt-oss-20b:free": "gpt-oss-20b",
+    "anthropic/claude-opus-5": "claude-opus-5",
 }
 
 
@@ -193,20 +191,6 @@ body {
   flex-shrink: 0;
 }
 
-.demo-title-with-logo {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-4);
-}
-
-.demo-subtitle {
-  font-weight: 500;
-  font-size: var(--text-body);
-  line-height: 1.5;
-  color: var(--color-ink);
-  margin-top: var(--space-3);
-}
-
 .demo-supporting {
   font-weight: 400;
   font-size: var(--text-label);
@@ -265,15 +249,6 @@ body {
   padding: var(--space-6) !important;
 }
 
-/* Setup banner — warning on paper, strong black rule instead of color edge */
-.q-card.demo-setup-banner {
-  background-color: var(--color-warning-bg) !important;
-  border-radius: var(--radius) !important;
-  border: 1px solid var(--color-rule) !important;
-  box-shadow: none !important;
-  padding: var(--space-4) var(--space-6) !important;
-}
-
 /* --- Buttons --- */
 
 /* Primary — violet block, sharp Swiss radius */
@@ -328,138 +303,7 @@ body {
   color: var(--color-ink) !important;
 }
 
-/* --- Telemetry table — full width, bordered, no stripe --- */
-
-.demo-telemetry-table {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.demo-telemetry-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-  background-color: var(--color-surface);
-}
-.demo-telemetry-row:last-child {
-  border-bottom: none;
-}
-
-.demo-telemetry-label {
-  font-weight: 500;
-  font-size: var(--text-micro);
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.demo-telemetry-value {
-  font-family: var(--font-mono);
-  font-weight: 400;
-  font-size: var(--text-detail);
-  color: var(--color-text-main);
-  text-align: right;
-  max-width: 65%;
-  word-break: break-word;
-}
-
-/* --- History grid --- */
-
-.demo-grid-scroll {
-  overflow-x: auto;
-  width: 100%;
-  padding-bottom: var(--space-2);
-  scrollbar-color: var(--color-rule) transparent;
-  scrollbar-width: thin;
-}
-
-.demo-grid-scroll::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-
-.demo-grid-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.demo-grid-scroll::-webkit-scrollbar-thumb {
-  background: var(--color-rule);
-  border-radius: 0;
-}
-
-.demo-grid-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-secondary);
-}
-
-.demo-grid-scroll .nicegui-grid {
-  width: max-content;
-  min-width: 100%;
-}
-
-.demo-grid-header {
-  font-weight: 500;
-  font-size: var(--text-micro);
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 2px solid var(--color-border);
-  white-space: nowrap;
-}
-
-.demo-grid-cell {
-  font-family: var(--font-mono);
-  font-weight: 400;
-  font-size: var(--text-detail);
-  color: var(--color-text-main);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.demo-grid-link,
-.demo-grid-link:visited {
-  color: var(--color-ink);
-  text-decoration: underline;
-  text-decoration-color: var(--color-accent);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-}
-
-.demo-grid-link:hover {
-  color: var(--color-accent);
-}
-
-.demo-cell-tooltip {
-  font-family: var(--font-mono);
-  font-size: var(--text-detail);
-  background-color: var(--color-text-main);
-  color: var(--color-surface);
-  border-radius: var(--radius);
-  padding: var(--space-1) var(--space-2);
-  max-width: 320px;
-  word-break: break-all;
-}
-
 /* --- Toggle / strategy --- */
-
-.demo-toggle-help {
-  font-weight: 400;
-  font-size: var(--text-detail);
-  line-height: 1.5;
-  color: var(--color-text-secondary);
-  margin-top: 2px;
-}
 
 .demo-strategy-desc {
   font-weight: 400;
@@ -468,8 +312,26 @@ body {
   color: var(--color-text-secondary);
 }
 
-.demo-strategy-select {
+.demo-strategy-radio {
   --q-primary: var(--color-ink) !important;
+  padding: 0.25rem 0;
+}
+
+.demo-strategy-radio .q-radio {
+  align-items: center;
+}
+
+.demo-strategy-radio .q-radio__label {
+  font-family: var(--font-sans) !important;
+  font-size: var(--text-body) !important;
+  font-weight: 500 !important;
+  color: var(--color-text-primary) !important;
+  text-transform: none !important;
+  margin-left: 0.5rem;
+}
+
+.demo-strategy-radio .q-radio__inner {
+  color: var(--color-ink) !important;
 }
 
 .demo-prompt-card {
@@ -517,12 +379,6 @@ body {
   background-color: var(--color-surface-alt) !important;
 }
 
-.demo-toggle-row .q-checkbox__label {
-  font-weight: 500;
-  font-size: var(--text-label);
-  line-height: 1.4;
-}
-
 /* --- Response panel --- */
 
 .demo-response-text {
@@ -536,12 +392,25 @@ body {
 }
 
 .demo-response-output {
-  min-height: 16rem;
-  max-height: 32rem;
+  flex: 1 1 auto;
   overflow-y: auto;
   padding-right: var(--space-2);
   scrollbar-color: var(--color-rule) transparent;
   scrollbar-width: thin;
+}
+
+.demo-response-card {
+  display: flex !important;
+  flex-direction: column;
+  min-height: 42rem;
+}
+
+/* The ui.refreshable wrapper inside the response card must flex to fill */
+.demo-response-card > .nicegui-refreshable {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .demo-response-status {
@@ -555,6 +424,82 @@ body {
 .demo-response-status--error { color: var(--color-error); }
 .demo-response-status--streaming { color: var(--color-accent); }
 
+/* --- Evaluation scores table --- */
+
+.demo-scores-card {
+  display: flex !important;
+  flex-direction: column;
+}
+
+.demo-scores-heading {
+  margin-bottom: var(--space-4);
+}
+
+.demo-score-comment {
+  max-width: 24rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.demo-score-value--pass { color: var(--color-success); font-weight: 600; }
+.demo-score-value--fail { color: var(--color-error); font-weight: 600; }
+
+.demo-scores-empty {
+  font-weight: 400;
+  font-size: var(--text-detail);
+  color: var(--color-text-secondary);
+}
+
+.demo-scores-spinner {
+  color: var(--color-accent);
+}
+
+.demo-scores-meta {
+  font-weight: 400;
+  font-size: var(--text-detail);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-3);
+}
+
+.demo-scores-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+  font-size: var(--text-detail);
+}
+
+.demo-scores-table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 2px solid var(--color-rule-strong);
+}
+
+.demo-scores-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-main);
+  vertical-align: top;
+}
+
+.demo-scores-table td.demo-score-cell--mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+}
+
+.demo-scores-table td.demo-score-cell--truncate {
+  max-width: 16rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* --- Status bar — black instrument strip --- */
 
 .demo-status-bar {
@@ -562,9 +507,8 @@ body {
   align-items: center;
   gap: var(--space-8);
   padding: var(--space-3) var(--space-6);
-  background-color: var(--color-ink);
   border-radius: var(--radius-sm);
-  border: none;
+  border: 4px solid var(--color-border-accent);
 }
 
 .demo-status-item {
@@ -586,13 +530,7 @@ body {
 .demo-status-item-label {
   font-weight: 500;
   font-size: var(--text-detail);
-  color: #FFFFFF;
-}
-
-.demo-status-item-detail {
-  font-weight: 400;
-  font-size: var(--text-micro);
-  color: rgba(255, 255, 255, 0.62);
+  color: #8A2BE2;
 }
 
 /* --- Section divider --- */
@@ -605,39 +543,6 @@ body {
 
 /* --- Tabs --- */
 
-.demo-tabs .q-tab {
-  font-family: var(--font-ui);
-  font-weight: 500;
-  font-size: var(--text-label);
-  text-transform: none;
-  color: var(--color-text-secondary);
-  padding: var(--space-2) var(--space-4);
-  min-height: 40px;
-}
-
-.demo-tabs .q-tab--active {
-  color: var(--color-ink);
-}
-
-.demo-tabs .q-tab__indicator {
-  background-color: var(--color-ink);
-  height: 2px;
-}
-
-.demo-tabs .q-tabs__bar {
-  border-bottom: 1px solid var(--color-border);
-  justify-content: flex-start;
-}
-
-/* Tab panels — transparent, no padding */
-.q-tab-panels {
-  background-color: transparent !important;
-}
-
-.q-tab-panel {
-  padding: 0 !important;
-}
-
 /* --- Browser surfaces --- */
 
 *:focus-visible {
@@ -647,16 +552,12 @@ body {
 
 .q-focusable:focus,
 .q-btn:focus,
-.q-field__native:focus,
-.q-toggle:focus,
-.q-tab:focus {
+.q-field__native:focus {
   outline: 2px solid var(--color-accent) !important;
   outline-offset: 3px;
 }
 
-.q-btn:focus,
-.q-toggle:focus,
-.q-tab:focus {
+.q-btn:focus {
   box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent) !important;
 }
 
@@ -707,41 +608,22 @@ def _format_metadata(value: str | Unavailable) -> str:
     return format_trace(value, unavailable=_UNAVAILABLE_COPY)
 
 
-def _format_tokens(value: int | Unavailable) -> str:
-    return format_number(value, unavailable=_UNAVAILABLE_COPY)
-
-
-def _format_latency(value: int | Unavailable) -> str:
-    return format_latency(value, unavailable=_LATENCY_UNAVAILABLE_COPY)
-
-
 def _format_cost(value: float | Unavailable) -> str:
     return format_cost(value, unavailable=_COST_UNAVAILABLE_COPY)
 
 
+def _html_escape(value: str) -> str:
+    return (
+        value.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#39;")
+    )
+
+
 def _strategy_with_model(strategy: RoutingStrategy, model_id: str) -> RoutingStrategy:
     return replace(strategy, model=model_id)
-
-
-def _format_trace_cell(telemetry: TelemetryEvidence | None) -> str:
-    if telemetry is None:
-        return _UNAVAILABLE_COPY
-    if telemetry.trace_status == "enabled":
-        return telemetry.trace_url or telemetry.trace_id or _UNAVAILABLE_COPY
-    if telemetry.trace_status == "disabled":
-        return TRACE_DISABLED
-    return _UNAVAILABLE_COPY
-
-
-def _format_router_cell(telemetry: TelemetryEvidence | None) -> str:
-    if telemetry is None:
-        return _UNAVAILABLE_COPY
-    meta = telemetry.openrouter_metadata
-    if isinstance(meta, dict):
-        router_id = meta.get("id") or meta.get("upstream_id")
-        if isinstance(router_id, str) and router_id:
-            return router_id
-    return _UNAVAILABLE_COPY
 
 
 def _heading(text: str, *, level: int, classes: str) -> None:
@@ -767,14 +649,9 @@ SAMPLE_PROMPTS = (
 
 EVAL_SCENARIO = (
     "Handling API reliability complaints can be complex and time-consuming. Support teams often struggle to triage issues quickly, draft effective responses, and provide actionable feedback to product teams. This slows down resolution times and impacts customer satisfaction."
-    "Imagine an AI assistant that instantly drafts thoughtful, impact-aware support replies—acknowledging customer pain points without defensiveness, requesting clear diagnostics, and offering honest next steps. Ishlab’s demo showcases exactly that, helping support staff move faster and smarter."
+    "Imagine an AI assistant that instantly drafts thoughtful, impact-aware support replies—acknowledging customer pain points without defensiveness, requesting clear diagnostics, and offering honest next steps. Ishlab's demo showcases exactly that, helping support staff move faster and smarter."
 )
 
-EVAL_PROOF = (
-    "Make It Reliable: Watch how routing preferences and graceful error handling keep your service steady, even under pressure.\n"
-    "Make It Economical: Understand how different model choices impact cost, latency, and token usage—empowering you to optimize for price-performance balance.\n"
-    "Make Changes Safely: Evaluate models side-by-side with quality scoring, traceability via Langfuse, and data-driven decision-making to pick the best fit for your need."
-)
 EVAL_DESCRIPTION = (
     "An angry customer says the API keeps failing and hints they're ready to leave.\n"
     "\n"
@@ -802,6 +679,12 @@ class _UIState:
     last_run: InferenceRun | None = None
     response: str = ""
     response_status: str = EMPTY_RESPONSE
+    is_fetching_scores: bool = False
+    scores: tuple[LangfuseScore, ...] | None = None
+    scores_fetch_status: str = ""
+    current_trace_id: str | None = None
+    current_observation_id: str | None = None
+    observation_details: ObservationDetails | None = None
 
 
 async def _run_inference(
@@ -829,6 +712,7 @@ async def _run_inference(
             trace_status: str | Unavailable = UNAVAILABLE
             trace_id: str | None = None
             trace_url: str | None = None
+            observation_id: str | None = None
             if config is not None:
                 model_for_trace = (
                     event.model if not isinstance(event.model, Unavailable) else strategy.model
@@ -849,6 +733,7 @@ async def _run_inference(
                 trace_status = outcome.status
                 trace_id = outcome.trace_id
                 trace_url = outcome.trace_url
+                observation_id = outcome.observation_id
 
             telemetry = TelemetryEvidence(
                 model=event.model,
@@ -865,6 +750,7 @@ async def _run_inference(
                 trace_status=trace_status,
                 trace_id=trace_id,
                 trace_url=trace_url,
+                observation_id=observation_id,
             )
             run = InferenceRun(
                 run_id=uuid.uuid4().hex,
@@ -919,7 +805,6 @@ def build_app(
     ui.add_head_html('<link rel="icon" href="assets/favicon.ico" type="image/x-icon">')
     state = _UIState()
     initial_strategy_name = next(iter(STRATEGIES))
-    model_options: tuple[str, ...] = STRATEGY_MODEL_OPTIONS[initial_strategy_name]
 
     # Mount static assets for avatar and logo
     assets_dir = Path(__file__).parent.parent.parent / "assets"
@@ -931,7 +816,7 @@ def build_app(
             not config.openrouter_ready
             or state.is_running
             or not str(prompt.value or "").strip()
-            or not str(model_select.value or "").strip()
+            or not str(strategy_select.value or "").strip()
         )
         if disabled:
             run_button.disable()
@@ -956,11 +841,124 @@ def build_app(
     def refresh(panel: object) -> None:
         cast(Any, panel).refresh()
 
+    @ui.refreshable
+    def eval_scores_panel() -> None:
+        if not config.langfuse_ready:
+            ui.label(
+                "Langfuse tracing is not configured. Set LANGFUSE_PUBLIC_KEY, "
+                "LANGFUSE_SECRET_KEY, and LANGFUSE_BASE_URL to fetch evaluation scores."
+            ).classes("demo-scores-empty")
+            return
+        if state.is_fetching_scores:
+            with ui.row().classes("items-center gap-2"):
+                ui.spinner(size="1.25rem").classes("demo-scores-spinner")
+                ui.label("Waiting for trace scores…").classes("demo-scores-empty")
+            return
+        if state.scores_fetch_status == "failed":
+            ui.label("Failed to fetch scores.").classes("demo-scores-empty")
+            return
+        if state.scores is None:
+            ui.label("Run inference to load evaluation scores from Langfuse.").classes(
+                "demo-scores-empty"
+            )
+            return
+        if not state.scores:
+            ui.label(
+                "No evaluation scores found yet. Run inference to generate traces, "
+                "then wait for Langfuse evaluator jobs to score them."
+            ).classes("demo-scores-empty")
+            return
+
+        if state.observation_details is not None:
+            details = state.observation_details
+            detail_parts: list[str] = []
+            if details.model_name:
+                detail_parts.append(f"Model: {_html_escape(details.model_name)}")
+            if details.latency_ms is not None:
+                detail_parts.append(f"Latency: {details.latency_ms:.0f} ms")
+            if details.model_parameters:
+                params = ", ".join(f"{k}={v}" for k, v in details.model_parameters.items())
+                detail_parts.append(f"Params: {_html_escape(params)}")
+            if detail_parts:
+                ui.label(" · ".join(detail_parts)).classes("demo-scores-meta")
+
+        rows_html: list[str] = []
+        for score in state.scores:
+            value_class = ""
+            if score.data_type == "BOOLEAN":
+                value_class = (
+                    "demo-score-value--pass" if bool(score.value) else "demo-score-value--fail"
+                )
+            trace_label = f"{score.trace_id[:8]}…" if score.trace_id else "—"
+            trace_title = score.trace_id or ""
+            comment_title = score.comment or ""
+            name_cell = (
+                f'<td class="demo-score-cell--truncate" title="{_html_escape(comment_title)}">'
+                f"{_html_escape(score.name)}</td>"
+            )
+            value_cell = f'<td class="{value_class}">{_html_escape(score.display_value)}</td>'
+            trace_cell = (
+                f'<td class="demo-score-cell--mono" title="{_html_escape(trace_title)}">'
+                f"{_html_escape(trace_label)}</td>"
+            )
+            rows_html.append(
+                "<tr>"
+                + name_cell
+                + f"<td>{_html_escape(score.data_type)}</td>"
+                + value_cell
+                + trace_cell
+                + f'<td class="demo-score-cell--mono">{_html_escape(score.timestamp)}</td>'
+                + "</tr>"
+            )
+
+        table_html = (
+            '<table class="demo-scores-table"><colgroup>'
+            '<col style="width: 30%"><col style="width: 15%"><col style="width: 15%">'
+            '<col style="width: 20%"><col style="width: 20%"></colgroup>'
+            "<thead><tr>"
+            "<th>Name</th><th>Type</th><th>Value</th><th>Trace</th><th>Timestamp</th>"
+            "</tr></thead><tbody>" + "".join(rows_html) + "</tbody></table>"
+        )
+        ui.html(table_html).classes("w-full")
+
+    async def fetch_scores_handler() -> None:
+        if not config.langfuse_ready or state.is_fetching_scores:
+            return
+        state.is_fetching_scores = True
+        refresh(eval_scores_panel)
+        scores: tuple[LangfuseScore, ...] = ()
+        status = "enabled"
+        if state.current_observation_id:
+            prev_count = -1
+            for _ in range(10):
+                outcome = await fetch_langfuse_scores(
+                    config,
+                    limit=50,
+                    trace_id=state.current_trace_id,
+                    observation_id=state.current_observation_id,
+                )
+                status = outcome.status
+                if outcome.status != "enabled":
+                    break
+                scores = outcome.scores or ()
+                if scores and len(scores) == prev_count:
+                    break
+                prev_count = len(scores)
+                await asyncio.sleep(3)
+        state.scores = scores
+        state.scores_fetch_status = status
+        state.observation_details = await fetch_observation_details(
+            config, observation_id=state.current_observation_id or ""
+        )
+        state.is_fetching_scores = False
+        refresh(eval_scores_panel)
+
     async def run_request() -> None:
         if not config.openrouter_ready or state.is_running:
             return
         prompt_text = str(prompt.value or "").strip()
-        model_id = str(model_select.value or "").strip()
+        selected_strategy = STRATEGIES.get(strategy_select.value, INTELLIGENCE_STRATEGY)
+        model_id = STRATEGY_MODELS[selected_strategy.name]
         if not prompt_text or not model_id:
             sync_run_button()
             return
@@ -981,7 +979,7 @@ def build_app(
                 yield event
 
         selected_strategy = _strategy_with_model(
-            STRATEGIES.get(strategy_select.value, INTELLIGENCE_STRATEGY),
+            selected_strategy,
             model_id,
         )
         run = await _run_inference(
@@ -994,6 +992,9 @@ def build_app(
         )
         state.is_running = False
         state.last_run = run
+        state.current_trace_id = run.telemetry.trace_id if run.telemetry else None
+        state.current_observation_id = run.telemetry.observation_id if run.telemetry else None
+        state.observation_details = None
         state.response = run.streamed_text
         if run.status in (Status.SUCCEEDED, Status.FALLBACK_SUCCEEDED):
             state.response_status = SUCCESS_RESPONSE
@@ -1001,9 +1002,7 @@ def build_app(
             state.response_status = FAILURE_RESPONSE
         sync_run_button()
         refresh(response_panel)
-        refresh(telemetry_panel)
-        refresh(history_panel)
-        refresh(comparison_panel)
+        await fetch_scores_handler()
 
     def fill_prompt(value: str) -> None:
         prompt.value = value
@@ -1029,30 +1028,29 @@ def build_app(
         # Request panel with section dividers
         with ui.card().classes("w-full demo-card"):
             _heading(
-                "Experience how prompt routing, traceability, and evaluation come together",
+                "Prompt routing, traceability, and evaluation come together for meaningful production inference",
                 level=3,
                 classes="text-section-heading",
             )
             _heading("Prompt Evaluation Scenario", level=5, classes="text-section-heading")
             # ui.html preserves the \n line breaks via whitespace-pre-line
             ui.html(EVAL_SCENARIO).classes("demo-body").style("white-space: pre-line;")
-            _heading("Prompt Evaluation Description", level=5, classes="text-section-heading")
+            _heading("Prompt Evaluation", level=5, classes="text-section-heading")
             ui.html(EVAL_DESCRIPTION).classes("demo-body").style("white-space: pre-line;")
-            _heading(
-                "Real-World Scenarios That Prove It Works", level=4, classes="text-section-heading"
-            )
-            ui.html(EVAL_PROOF).classes("demo-body").style("white-space: pre-line;")
-            _heading("Eval Scorecard", level=4, classes="text-section-heading")
 
-    def _status_item(label: str, ready: bool, detail: str) -> None:
-        dot_class = "demo-status-dot--ready" if ready else "demo-status-dot--warning"
-        short_detail = "Ready" if ready else "Needs setup"
-        with ui.element("div").classes("demo-status-item").props(f'aria-label="{label}: {detail}"'):
-            ui.element("div").classes(f"demo-status-dot {dot_class}")
-            ui.label(label).classes("demo-status-item-label")
-            ui.label(short_detail).classes("demo-status-item-label")
+        def _status_item(label: str, ready: bool, detail: str) -> None:
+            dot_class = "demo-status-dot--ready" if ready else "demo-status-dot--warning"
+            short_detail = "Ready" if ready else "Needs setup"
+            with (
+                ui.element("div")
+                .classes("demo-status-item")
+                .props(f'aria-label="{label}: {detail}"')
+            ):
+                ui.element("div").classes(f"demo-status-dot {dot_class}")
+                ui.label(label).classes("demo-status-item-label")
+                ui.label(short_detail).classes("demo-status-item-label")
 
-            # Compact inline status bar
+        # Compact inline status bar
         with (
             ui.element("div")
             .classes("demo-status-bar")
@@ -1096,48 +1094,31 @@ def build_app(
 
                     ui.element("div").classes("demo-section-divider")
 
-                _heading("Model Choice Strategy", level=2, classes="demo-component-heading")
+                _heading("Strategy", level=2, classes="demo-component-heading")
                 strategy_select = (
-                    ui.select(
+                    ui.radio(
                         options={
-                            s.name: ROUTING_STRATEGY_LABELS[s.name] for s in STRATEGIES.values()
+                            s.name: f"{ROUTING_STRATEGY_LABELS[s.name]}: {STRATEGY_MODEL_SHORT_NAMES[STRATEGY_MODELS[s.name]]}"
+                            for s in STRATEGIES.values()
                         },
                         value=initial_strategy_name,
                     )
-                    .classes("w-full demo-strategy-select")
-                    .props('aria-label="Routing strategy" popup-content-class=demo-strategy-menu')
+                    .props('aria-label="Routing strategy"')
+                    .classes("demo-strategy-radio")
                     .style("--q-primary: var(--color-ink);")
                 )
                 strategy_description_label = ui.label(
                     STRATEGIES[initial_strategy_name].description
                 ).classes("demo-strategy-desc")
 
-                def update_strategy_description(_: object) -> None:
+                def update_strategy_display(_: object) -> None:
                     selected = STRATEGIES.get(strategy_select.value, INTELLIGENCE_STRATEGY)
                     strategy_description_label.text = selected.description
-                    model_select.options = STRATEGY_MODEL_OPTIONS[selected.name]
-                    model_select.value = None
-                    model_select.update()
                     sync_run_button()
 
-                strategy_select.on("update:model-value", update_strategy_description)
+                strategy_select.on("update:model-value", update_strategy_display)
 
                 ui.element("div").classes("demo-section-divider")
-
-                _heading("Model", level=2, classes="demo-component-heading")
-                model_select = (
-                    ui.select(
-                        options=model_options,
-                        value=None,
-                    )
-                    .classes("w-full demo-strategy-select")
-                    .props('aria-label="Model" popup-content-class=demo-strategy-menu clearable')
-                    .style("--q-primary: var(--color-ink);")
-                )
-                model_select.on("update:model-value", lambda _: sync_run_button())
-                ui.label(
-                    "Choose one of the three hard-coded models for the selected strategy."
-                ).classes("demo-strategy-desc")
 
                 ui.element("div").classes("demo-section-divider")
 
@@ -1150,12 +1131,11 @@ def build_app(
                     )
                     run_button.disable()
 
-            # Response panel (side by side with prompt card)
-            with ui.card().classes("flex-1 demo-card"):
+            with ui.card().classes("flex-1 demo-card demo-response-card"):
                 response_panel()
 
-        # Tabbed evidence: Telemetry + Run History + Comparison
-        with ui.tabs().props("align=left").classes("w-full demo-tabs") as tabs:
-            ui.tab("Telemetry")
-            ui.tab("Run History")
-            ui.tab("Comparison")
+        with ui.card().classes("w-full demo-card demo-scores-card"):
+            _heading(
+                "Evaluation Scores", level=2, classes="demo-section-heading demo-scores-heading"
+            )
+            eval_scores_panel()

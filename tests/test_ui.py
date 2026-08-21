@@ -5,7 +5,7 @@ from pathlib import Path
 
 from openrouter_demo.client import OpenRouterHTTPError
 from openrouter_demo.config import load_config
-from openrouter_demo.history import RunHistory
+from openrouter_demo.sqlite_store import SQLiteRunHistory
 from openrouter_demo.models import (
     UNAVAILABLE,
     AttemptRecord,
@@ -16,13 +16,19 @@ from openrouter_demo.models import (
     StreamedResult,
     TelemetryEvidence,
 )
-from openrouter_demo.routing import COST_STRATEGY, DEFAULT_STRATEGY, LATENCY_STRATEGY, STRATEGIES
+from openrouter_demo.routing import (
+    COST_STRATEGY,
+    DEFAULT_STRATEGY,
+    LATENCY_STRATEGY,
+    STRATEGIES,
+)
 from openrouter_demo.ui import (
     EVAL_DESCRIPTION,
     EVAL_SCORING_ROWS,
-    FALLBACK_SUCCESS_RESPONSE,
     SAMPLE_PROMPTS,
+    STRATEGY_MODEL_OPTIONS,
     STREAMING_RESPONSE,
+    SUCCESS_RESPONSE,
     _comparison_rows,
     _format_cost,
     _format_metadata,
@@ -30,7 +36,7 @@ from openrouter_demo.ui import (
     _history_trace_href,
     _run_fallback_inference,
     _run_inference,
-    _run_repeat_inference,
+    _strategy_with_model,
     _telemetry_rows,
 )
 
@@ -56,7 +62,7 @@ def test_run_inference_records_successful_stream() -> None:
             latency_ms=321,
         )
 
-    history = RunHistory()
+    history = SQLiteRunHistory(db_path=":memory:")
     run = _run(
         _run_inference(
             "Explain streaming", api_key="sk-test", history=history, stream_fn=fake_stream
@@ -89,7 +95,7 @@ def test_run_inference_preserves_unavailable_metadata() -> None:
         )
 
     run = _run(
-        _run_inference("Prompt", api_key="sk-test", history=RunHistory(), stream_fn=fake_stream)
+        _run_inference("Prompt", api_key="sk-test", history=SQLiteRunHistory(db_path=":memory:"), stream_fn=fake_stream)
     )
 
     assert run.telemetry is not None
@@ -108,7 +114,7 @@ def test_run_inference_records_partial_text_on_stream_failure() -> None:
         yield StreamChunk("partial")
         raise OpenRouterHTTPError("provider failed", status_code=500, partial_text="partial")
 
-    history = RunHistory()
+    history = SQLiteRunHistory(db_path=":memory:")
     run = _run(_run_inference("Prompt", api_key="sk-test", history=history, stream_fn=fake_stream))
 
     assert run.status is Status.FAILED
@@ -125,7 +131,7 @@ def test_run_inference_rejects_blank_prompt() -> None:
         raise AssertionError("blank prompts must not start a request")
 
     try:
-        _run(_run_inference("  ", api_key="sk-test", history=RunHistory(), stream_fn=fake_stream))
+        _run(_run_inference("  ", api_key="sk-test", history=SQLiteRunHistory(db_path=":memory:"), stream_fn=fake_stream))
     except ValueError as exc:
         assert str(exc) == "Prompt must not be blank."
     else:
@@ -152,7 +158,7 @@ def test_telemetry_and_history_rows_render_unavailable_copy() -> None:
             cost_usd=UNAVAILABLE,
         ),
     )
-    history = RunHistory()
+    history = SQLiteRunHistory(db_path=":memory:")
     history.append(run)
 
     telemetry = dict(_telemetry_rows(run))
@@ -166,8 +172,7 @@ def test_telemetry_and_history_rows_render_unavailable_copy() -> None:
         "15 ms",
         "Unavailable from selected route/provider.",
         "Cost metadata was not returned for this route/provider.",
-        "—",
-        "—",
+        "Unavailable from selected route/provider.",
     )
 
 
@@ -188,9 +193,14 @@ def test_telemetry_rows_reflect_run_strategy() -> None:
     assert telemetry["Strategy"] == "cost"
 
     idle = dict(_telemetry_rows(None))
-    assert idle["Strategy"] == DEFAULT_STRATEGY.name
-    assert idle["Latency"] == "Latency was not returned for this route/provider."
-    assert idle["Tokens"] == "Unavailable from selected route/provider."
+    assert idle["Strategy"] == "Waiting"
+    assert idle["Model"] == "Waiting"
+    assert idle["Provider"] == "Waiting"
+    assert idle["Latency"] == "Waiting"
+    assert idle["Tokens"] == "Waiting"
+    assert idle["Cost"] == "Waiting"
+    assert idle["Router"] == "Waiting"
+    assert idle["Trace"] == "Waiting"
 
 
 def test_telemetry_rows_streaming_state_copy() -> None:
@@ -218,7 +228,7 @@ def test_run_inference_records_cost_strategy_name() -> None:
         _run_inference(
             "Prompt",
             api_key="sk-test",
-            history=RunHistory(),
+            history=SQLiteRunHistory(db_path=":memory:"),
             stream_fn=fake_stream,
             strategy=COST_STRATEGY,
         )
@@ -245,7 +255,7 @@ def test_run_inference_records_latency_strategy_name() -> None:
         _run_inference(
             "Prompt",
             api_key="sk-test",
-            history=RunHistory(),
+            history=SQLiteRunHistory(db_path=":memory:"),
             stream_fn=fake_stream,
             strategy=LATENCY_STRATEGY,
         )
@@ -254,10 +264,45 @@ def test_run_inference_records_latency_strategy_name() -> None:
 
 
 def test_strategies_dict_contains_three_selectable_strategies() -> None:
-    assert set(STRATEGIES.keys()) == {"default", "cost", "latency"}
+    assert set(STRATEGIES.keys()) == {"cost", "latency", "intelligence"}
 
 
-def test_history_rows_include_fallback_column() -> None:
+def test_strategy_with_model_preserves_routing_preferences() -> None:
+    strategy = _strategy_with_model(COST_STRATEGY, "mistralai/mistral-nemo")
+
+    assert strategy.name == COST_STRATEGY.name
+    assert strategy.description == COST_STRATEGY.description
+    assert strategy.provider_preferences == COST_STRATEGY.provider_preferences
+    assert strategy.model == "mistralai/mistral-nemo"
+    assert COST_STRATEGY.model == DEFAULT_STRATEGY.model
+
+
+def test_strategy_model_options_are_hard_coded_by_strategy() -> None:
+    assert STRATEGY_MODEL_OPTIONS == {
+        "cost": {
+            "nvidia/nemotron-3.5-lightning:free": "nvidia/nemotron-3.5-lightning:free",
+            "google/gemma-4-31b-it:free": "google/gemma-4-31b-it:free",
+            "openai/gpt-oss-20b:free": "openai/gpt-oss-20b:free",
+        },
+        "latency": {
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": (
+                "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+            ),
+            "poolside/laguna-xs-2.1:free": "poolside/laguna-xs-2.1:free",
+            "google/gemma-4-26b-a4b-it:free": "google/gemma-4-26b-a4b-it:free",
+        },
+        "intelligence": {
+            "anthropic/claude-opus-5": "anthropic/claude-opus-5",
+            "openai/gpt-5.6-sol": "openai/gpt-5.6-sol",
+            "moonshotai/kimi-k3": "moonshotai/kimi-k3",
+        },
+    }
+    assert set(STRATEGY_MODEL_OPTIONS) == set(STRATEGIES)
+    assert all(len(options) == 3 for options in STRATEGY_MODEL_OPTIONS.values())
+    assert all(label == model_id for options in STRATEGY_MODEL_OPTIONS.values() for model_id, label in options.items())
+
+
+def test_history_rows_show_trace_without_fallback_or_cache_columns() -> None:
     run = InferenceRun(
         run_id="run-1",
         prompt="Prompt",
@@ -277,13 +322,12 @@ def test_history_rows_include_fallback_column() -> None:
             cost_usd=0.001,
         ),
     )
-    history = RunHistory()
+    history = SQLiteRunHistory(db_path=":memory:")
     history.append(run)
 
     rows = _history_rows(history)
-    assert len(rows[0]) == 9
-    assert rows[0][-2] == "—"
-    assert rows[0][-1] == "—"
+    assert len(rows[0]) == 8
+    assert rows[0][-1] == "Unavailable from selected route/provider."
 
     primary = AttemptRecord(
         model="nonexistent/fake-model-for-demo",
@@ -329,8 +373,8 @@ def test_history_rows_include_fallback_column() -> None:
     )
     history.append(fallback_run)
     rows = _history_rows(history)
-    assert rows[1][-2] == "Yes"
-    assert rows[1][-1] == "—"
+    assert len(rows[1]) == 8
+    assert "Yes" not in rows[1]
 
 
 def test_telemetry_rows_fallback_success_status() -> None:
@@ -378,7 +422,7 @@ def test_telemetry_rows_fallback_success_status() -> None:
     )
 
     rows = dict(_telemetry_rows(run))
-    assert rows["Status"] == FALLBACK_SUCCESS_RESPONSE
+    assert rows["Status"] == SUCCESS_RESPONSE
 
 
 def test_run_fallback_inference_produces_fallback_succeeded_run() -> None:
@@ -410,7 +454,7 @@ def test_run_fallback_inference_produces_fallback_succeeded_run() -> None:
         _run_fallback_inference(
             "test",
             api_key="sk-test",
-            history=RunHistory(),
+            history=SQLiteRunHistory(db_path=":memory:"),
             fallback_strategy=DEFAULT_STRATEGY,
             stream_fn=dual_stream,
         )
@@ -471,12 +515,9 @@ def test_telemetry_rows_render_fallback_evidence() -> None:
     )
 
     rows = dict(_telemetry_rows(run))
-    assert rows["Status"] == FALLBACK_SUCCESS_RESPONSE
-    assert rows["Primary status"] == "failed"
-    assert rows["Primary error"] == "OpenRouter request failed (404)"
-    assert rows["Fallback model"] == "openai/gpt-4o-mini"
-    assert rows["Fallback status"] == "succeeded"
-    assert rows["Failure type"] == "Simulated failure triggered for demo."
+    assert rows["Status"] == SUCCESS_RESPONSE
+    assert "Primary status" not in rows
+    assert "Fallback model" not in rows
 
 
 def test_run_inference_without_config_skips_tracing() -> None:
@@ -495,7 +536,7 @@ def test_run_inference_without_config_skips_tracing() -> None:
         )
 
     run = _run(
-        _run_inference("Prompt", api_key="sk-test", history=RunHistory(), stream_fn=fake_stream)
+        _run_inference("Prompt", api_key="sk-test", history=SQLiteRunHistory(db_path=":memory:"), stream_fn=fake_stream)
     )
     assert run.status is Status.SUCCEEDED
     assert run.telemetry is not None
@@ -522,7 +563,7 @@ def test_run_inference_with_langfuse_disabled_config_records_trace_status() -> N
         _run_inference(
             "Prompt",
             api_key="sk-test",
-            history=RunHistory(),
+            history=SQLiteRunHistory(db_path=":memory:"),
             stream_fn=fake_stream,
             config=load_config({}),
         )
@@ -533,7 +574,7 @@ def test_run_inference_with_langfuse_disabled_config_records_trace_status() -> N
     assert run.telemetry.trace_id is None
 
 
-def _dual_stream_for_repeat_ui_test() -> object:
+def _fallback_stream_for_ui_test() -> object:
     call_count = 0
 
     async def dual_stream(
@@ -565,9 +606,9 @@ def test_run_fallback_inference_without_config_skips_tracing() -> None:
         _run_fallback_inference(
             "test",
             api_key="sk-test",
-            history=RunHistory(),
+            history=SQLiteRunHistory(db_path=":memory:"),
             fallback_strategy=DEFAULT_STRATEGY,
-            stream_fn=_dual_stream_for_repeat_ui_test(),
+            stream_fn=_fallback_stream_for_ui_test(),
         )
     )
     assert run.status is Status.FALLBACK_SUCCEEDED
@@ -581,9 +622,9 @@ def test_run_fallback_inference_with_langfuse_disabled_config_records_trace_stat
         _run_fallback_inference(
             "test",
             api_key="sk-test",
-            history=RunHistory(),
+            history=SQLiteRunHistory(db_path=":memory:"),
             fallback_strategy=DEFAULT_STRATEGY,
-            stream_fn=_dual_stream_for_repeat_ui_test(),
+            stream_fn=_fallback_stream_for_ui_test(),
             config=load_config({}),
         )
     )
@@ -593,109 +634,7 @@ def test_run_fallback_inference_with_langfuse_disabled_config_records_trace_stat
     assert run.telemetry.trace_id is None
 
 
-def test_run_repeat_inference_produces_run_with_cache_and_delta() -> None:
-    call_count = 0
-
-    async def dual_stream(
-        *_args: object, **_kwargs: object
-    ) -> AsyncIterator[StreamChunk | StreamedResult]:
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            yield StreamedResult(
-                text="first",
-                model="openai/gpt-4o-mini",
-                provider="OpenAI",
-                prompt_tokens=3,
-                completion_tokens=4,
-                total_tokens=7,
-                cost_usd=0.006,
-                latency_ms=300,
-            )
-        else:
-            yield StreamChunk("second")
-            yield StreamedResult(
-                text="second",
-                model="openai/gpt-4o-mini",
-                provider="OpenAI",
-                prompt_tokens=3,
-                completion_tokens=4,
-                total_tokens=7,
-                cost_usd=0.004,
-                latency_ms=180,
-            )
-
-    run = _run(
-        _run_repeat_inference(
-            "test",
-            api_key="sk-test",
-            history=RunHistory(),
-            strategy=DEFAULT_STRATEGY,
-            config=load_config({}),
-            stream_fn=dual_stream,
-        )
-    )
-
-    assert run.status is Status.SUCCEEDED
-    assert run.repeat_observation is not None
-    assert run.telemetry is not None
-    assert run.telemetry.cache_status is UNAVAILABLE
-    assert "Observed repeat" in dict(_telemetry_rows(run))["Cache"]
-
-
-def test_run_repeat_inference_records_cache_hit() -> None:
-    call_count = 0
-
-    async def dual_stream(
-        *_args: object, **_kwargs: object
-    ) -> AsyncIterator[StreamChunk | StreamedResult]:
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            yield StreamedResult(
-                text="first",
-                model="openai/gpt-4o-mini",
-                provider="OpenAI",
-                prompt_tokens=3,
-                completion_tokens=4,
-                total_tokens=7,
-                cost_usd=0.006,
-                latency_ms=300,
-            )
-        else:
-            yield StreamedResult(
-                text="second",
-                model="openai/gpt-4o-mini",
-                provider="OpenAI",
-                prompt_tokens=3,
-                completion_tokens=4,
-                total_tokens=7,
-                cost_usd=0.004,
-                latency_ms=180,
-                cache_status="hit",
-                cached_tokens=10,
-                cache_write_tokens=0,
-            )
-
-    run = _run(
-        _run_repeat_inference(
-            "test",
-            api_key="sk-test",
-            history=RunHistory(),
-            strategy=DEFAULT_STRATEGY,
-            config=load_config({}),
-            stream_fn=dual_stream,
-        )
-    )
-
-    assert run.status is Status.SUCCEEDED
-    assert run.repeat_observation is not None
-    assert run.telemetry is not None
-    assert run.telemetry.cache_status == "hit"
-    assert run.telemetry.cached_tokens == 10
-
-
-def test_history_rows_render_cache_and_trace_link_target() -> None:
+def test_history_rows_render_trace_status_and_link_target() -> None:
     run = InferenceRun(
         run_id="run-cache-trace",
         prompt="Prompt",
@@ -713,19 +652,16 @@ def test_history_rows_render_cache_and_trace_link_target() -> None:
             completion_tokens=4,
             total_tokens=7,
             cost_usd=0.001,
-            cache_status="hit",
-            cached_tokens=10,
-            cache_write_tokens=0,
             trace_status="enabled",
             trace_id="abc123",
             trace_url="https://cloud.langfuse.com/traces/abc123",
         ),
     )
-    history = RunHistory()
+    history = SQLiteRunHistory(db_path=":memory:")
     history.append(run)
     rows = _history_rows(history)
-    assert len(rows[0]) == 9
-    assert rows[0][-1] == "hit (10)"
+    assert len(rows[0]) == 8
+    assert rows[0][-1] == "https://cloud.langfuse.com/traces/abc123"
     assert _history_trace_href(run) == "https://cloud.langfuse.com/traces/abc123"
 
 
@@ -751,7 +687,7 @@ def test_comparison_rows_include_completed_runs() -> None:
             ),
         )
 
-    history = RunHistory()
+    history = SQLiteRunHistory(db_path=":memory:")
     history.append(_run("openai/gpt-4o-mini", Status.SUCCEEDED))
     history.append(_run("openai/gpt-4o-mini-extra", Status.SUCCEEDED))
     history.append(_run("failed-model", Status.FAILED))
@@ -770,41 +706,39 @@ def test_comparison_rows_include_completed_runs() -> None:
     rows_limited = _comparison_rows(history, limit=1)
     assert len(rows_limited) == 1
 
-    # Cache labels in comparison rows must match history rows; trace URL moves to run links.
-    cache_trace_run = InferenceRun(
-        run_id="run-compare-cache-trace",
-        prompt="Prompt cache/trace",
+    # Trace labels in comparison rows must match history rows; trace URL also powers run links.
+    trace_run = InferenceRun(
+        run_id="run-compare-trace",
+        prompt="Prompt trace",
         strategy_name=DEFAULT_STRATEGY.name,
         started_at=datetime.now(UTC),
         completed_at=datetime.now(UTC),
         status=Status.SUCCEEDED,
-        streamed_text="cache trace done",
+        streamed_text="trace done",
         error_message=None,
         telemetry=TelemetryEvidence(
-            model="openai/gpt-4o-mini-cache-trace",
+            model="openai/gpt-4o-mini-trace",
             provider="OpenAI",
             latency_ms=250,
             prompt_tokens=4,
             completion_tokens=5,
             total_tokens=9,
             cost_usd=0.0015,
-            cache_status="hit",
-            cached_tokens=10,
-            cache_write_tokens=0,
             trace_status="enabled",
             trace_id="abc123",
             trace_url="https://cloud.langfuse.com/traces/abc123",
         ),
     )
-    cache_trace_history = RunHistory()
-    cache_trace_history.append(cache_trace_run)
+    trace_history = SQLiteRunHistory(db_path=":memory:")
+    trace_history.append(trace_run)
 
-    history_rows = _history_rows(cache_trace_history)
-    comparison_rows = _comparison_rows(cache_trace_history)
+    history_rows = _history_rows(trace_history)
+    comparison_rows = _comparison_rows(trace_history)
     assert len(history_rows) == 1
     assert len(comparison_rows) == 1
-    assert comparison_rows[0][-1] == history_rows[0][-1] == "hit (10)"
-    assert _history_trace_href(cache_trace_run) == "https://cloud.langfuse.com/traces/abc123"
+    assert comparison_rows[0][-1] == history_rows[0][-1]
+    assert comparison_rows[0][-1] == "https://cloud.langfuse.com/traces/abc123"
+    assert _history_trace_href(trace_run) == "https://cloud.langfuse.com/traces/abc123"
 
 
 def test_run_fallback_inference_appends_to_history() -> None:
@@ -830,7 +764,7 @@ def test_run_fallback_inference_appends_to_history() -> None:
             latency_ms=200,
         )
 
-    history = RunHistory()
+    history = SQLiteRunHistory(db_path=":memory:")
     run = _run(
         _run_fallback_inference(
             "test",
@@ -851,7 +785,12 @@ def test_ui_has_no_chatbot_labels() -> None:
         "The app runs live streaming inference",
         "This demo shows what changes when inference becomes something you have to operate",
         'ui.button("Run Inference", on_click=run_request)',
-        '"Streaming response"',
+        '"LLM Response"',
+        '"Model"',
+        '"Choose one of the three hard-coded models for the selected strategy."',
+        "demo-prompt-card",
+        "rows=18",
+        "demo-response-output",
         '"Telemetry"',
         '"Run history"',
         '"Comparison"',
@@ -884,12 +823,12 @@ def test_sample_prompt_buttons_have_short_labels_and_full_prompts() -> None:
 def test_prompt_panel_describes_eval_rubric() -> None:
     text = Path("src/openrouter_demo/ui.py").read_text()
 
-    assert "ui.label(EVAL_DESCRIPTION)" in text
+    assert "ui.html(EVAL_DESCRIPTION)" in text
     assert "_render_eval_scoring_table()" in text
-    assert "API reliability complaints" in EVAL_DESCRIPTION
-    assert "acknowledge impact" in EVAL_DESCRIPTION
-    assert "request concrete diagnostics" in EVAL_DESCRIPTION
-    assert "offer honest next steps" in EVAL_DESCRIPTION
+    assert "API keeps failing" in EVAL_DESCRIPTION
+    assert "Leads with the customer's problem" in EVAL_DESCRIPTION
+    assert "Asks for real detail" in EVAL_DESCRIPTION
+    assert "Commits to a next step" in EVAL_DESCRIPTION
     assert any("ACK, NODEF, DIAG, NEXT" in row[1] for row in EVAL_SCORING_ROWS)
     assert any(row[0] == "Tone score" for row in EVAL_SCORING_ROWS)
     assert any(row[0] == "Auto-fail" for row in EVAL_SCORING_ROWS)

@@ -101,7 +101,6 @@ Run Inference
 - Strategy selector
 - Strategy explanation
 - Failure simulation toggle
-- Repeat previous prompt action or note
 
 ### Strategy options
 

@@ -12,14 +12,12 @@ from openrouter_demo.config import (
 def test_missing_openrouter_key_is_reported() -> None:
     config = load_config({})
     assert config.openrouter_ready is False
-    assert config.missing_required == (OPENROUTER_API_KEY,)
     assert config.langfuse_ready is False
 
 
 def test_openrouter_key_sets_required_ready() -> None:
     config = load_config({OPENROUTER_API_KEY: "test-key"})
     assert config.openrouter_ready is True
-    assert config.missing_required == ()
     assert config.langfuse_ready is False
 
 
@@ -53,13 +51,9 @@ def test_langfuse_ready_requires_all_optional_vars() -> None:
     })
 
     assert incomplete.langfuse_ready is False
-    assert set(incomplete.missing_langfuse) == {LANGFUSE_SECRET_KEY, LANGFUSE_BASE_URL}
     assert only_secret.langfuse_ready is False
-    assert only_secret.missing_langfuse == (LANGFUSE_BASE_URL,)
     assert only_base_url.langfuse_ready is False
-    assert only_base_url.missing_langfuse == (LANGFUSE_SECRET_KEY,)
     assert complete.langfuse_ready is True
-    assert complete.missing_langfuse == ()
 
 
 def test_env_example_is_only_empty_assignments() -> None:

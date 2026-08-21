@@ -18,8 +18,6 @@ LANGFUSE_ENV_VARS = (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_BASE_URL
 class AppConfig:
     openrouter_ready: bool
     langfuse_ready: bool
-    missing_required: tuple[str, ...]
-    missing_langfuse: tuple[str, ...]
 
 
 def _missing(environ: Mapping[str, str], names: tuple[str, ...]) -> tuple[str, ...]:
@@ -35,6 +33,4 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     return AppConfig(
         openrouter_ready=not missing_required,
         langfuse_ready=not missing_langfuse,
-        missing_required=missing_required,
-        missing_langfuse=missing_langfuse,
     )

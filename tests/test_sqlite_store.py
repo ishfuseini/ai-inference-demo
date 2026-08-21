@@ -1,4 +1,3 @@
-import json
 from datetime import UTC, datetime
 
 from openrouter_demo.models import (
@@ -177,43 +176,3 @@ def test_round_trip_persists_repeat_observation(tmp_path) -> None:
     assert reloaded.repeat_observation.second.cost_usd == 0.004
     assert reloaded.repeat_observation.cache_status == "hit"
     assert reloaded.repeat_observation.cached_tokens == 10
-
-
-def test_legacy_flat_row_loads_via_compatibility_branch(tmp_path) -> None:
-    store = SQLiteRunHistory(db_path=str(tmp_path / "runs.db"))
-    legacy = json.dumps(
-        {
-            "model": "openai/gpt-4o-mini",
-            "provider": "OpenAI",
-            "latency_ms": 12,
-            "prompt_tokens": 3,
-            "completion_tokens": 4,
-            "total_tokens": 7,
-            "cost_usd": 0.001,
-        }
-    )
-    with store._lock:
-        cur = store._conn.cursor()
-        cur.execute(
-            "INSERT INTO runs (run_id, prompt, strategy_name, started_at, completed_at, status, streamed_text, error_message, telemetry_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                "legacy-1",
-                "Prompt",
-                "default",
-                "2026-08-19T00:00:00+00:00",
-                "2026-08-19T00:00:01+00:00",
-                "succeeded",
-                "done",
-                None,
-                legacy,
-            ),
-        )
-        store._conn.commit()
-
-    reloaded = store.get("legacy-1")
-    assert reloaded is not None
-    assert reloaded.telemetry is not None
-    assert reloaded.telemetry.model == "openai/gpt-4o-mini"
-    assert reloaded.telemetry.latency_ms == 12
-    assert reloaded.fallback_evidence is None
-    assert reloaded.repeat_observation is None

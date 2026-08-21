@@ -91,7 +91,6 @@ Controls:
 - `Latency optimized`
 - `Custom / explicit route`
 - `Simulate failure`
-- `Repeat previous prompt`
 
 Each strategy should have a short explanation.
 

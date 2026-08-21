@@ -25,9 +25,6 @@ def serialize_value(value: object) -> object:
 def deserialize_value(value: object) -> object:
     if value == _UNAVAILABLE_SENTINEL:
         return UNAVAILABLE
-    # Legacy asdict shape produced by dataclasses.asdict on a pre-Phase-4 row.
-    if isinstance(value, dict) and value == {"label": "unavailable"}:
-        return UNAVAILABLE
     return value
 
 

@@ -1,13 +1,12 @@
 from dataclasses import dataclass
 from typing import Literal
 
-StrategyName = Literal["default", "cost", "latency", "custom"]
+StrategyName = Literal["default", "cost", "latency", "intelligence", "custom"]
 
 ROUTING_STRATEGY_LABELS: dict[StrategyName, str] = {
-    "default": "Default",
-    "cost": "Cost optimized",
-    "latency": "Latency optimized",
-    "custom": "Custom",
+    "cost": "Cost",
+    "latency": "Latency",
+    "intelligence": "Intelligence",
 }
 
 
@@ -40,6 +39,13 @@ LATENCY_STRATEGY = RoutingStrategy(
     provider_preferences={"sort": "latency"},
 )
 
+INTELLIGENCE_STRATEGY = RoutingStrategy(
+    name="intelligence",
+    description="Prefer stronger models for quality-sensitive responses.",
+    model="anthropic/claude-opus-5",
+    provider_preferences=None,
+)
+
 FALLBACK_PRIMARY_STRATEGY = RoutingStrategy(
     name="custom",
     description="Simulated primary route failure for demo fallback scenario.",
@@ -48,9 +54,9 @@ FALLBACK_PRIMARY_STRATEGY = RoutingStrategy(
 )
 
 STRATEGIES: dict[StrategyName, RoutingStrategy] = {
-    "default": DEFAULT_STRATEGY,
     "cost": COST_STRATEGY,
     "latency": LATENCY_STRATEGY,
+    "intelligence": INTELLIGENCE_STRATEGY,
 }
 
 

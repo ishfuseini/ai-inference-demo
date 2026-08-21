@@ -9,7 +9,7 @@ from openrouter_demo.config import (
     LANGFUSE_SECRET_KEY,
     load_config,
 )
-from openrouter_demo.history import RunHistory
+from openrouter_demo.sqlite_store import SQLiteRunHistory
 from openrouter_demo.models import (
     UNAVAILABLE,
     InferenceRun,
@@ -193,7 +193,7 @@ def test_run_inference_trace_input_contains_no_api_key(monkeypatch) -> None:
         _run_inference(
             "Prompt",
             api_key="sk-test",
-            history=RunHistory(),
+            history=SQLiteRunHistory(db_path=":memory:"),
             stream_fn=fake_stream,
             config=load_config({}),
         )

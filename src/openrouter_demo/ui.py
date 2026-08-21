@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import uuid
 from collections.abc import AsyncIterator, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -13,14 +13,11 @@ from nicegui import ui
 from starlette.staticfiles import StaticFiles
 
 from openrouter_demo.client import OpenRouterError, stream_chat_completion
+from openrouter_demo.formatting import format_cost, format_latency, format_number, format_trace
 from openrouter_demo.config import OPENROUTER_API_KEY, AppConfig
-from openrouter_demo.history import RunHistory
 from openrouter_demo.models import (
     UNAVAILABLE,
-    AttemptRecord,
-    FallbackEvidence,
     InferenceRun,
-    RepeatObservation,
     Status,
     StreamChunk,
     StreamedResult,
@@ -29,11 +26,12 @@ from openrouter_demo.models import (
 )
 from openrouter_demo.routing import (
     DEFAULT_STRATEGY,
+    INTELLIGENCE_STRATEGY,
     ROUTING_STRATEGY_LABELS,
     STRATEGIES,
     RoutingStrategy,
 )
-from openrouter_demo.scenarios import FallbackResult, run_fallback_scenario, run_repeat_scenario
+from openrouter_demo.sqlite_store import SQLiteRunHistory
 from openrouter_demo.telemetry import record_trace
 
 type StreamFn = Callable[..., AsyncIterator[StreamChunk | StreamedResult]]
@@ -42,6 +40,25 @@ type StreamFn = Callable[..., AsyncIterator[StreamChunk | StreamedResult]]
 _UNAVAILABLE_COPY = "Unavailable from selected route/provider."
 _COST_UNAVAILABLE_COPY = "Cost metadata was not returned for this route/provider."
 _LATENCY_UNAVAILABLE_COPY = "Latency was not returned for this route/provider."
+_WAITING_COPY = "Waiting"
+
+STRATEGY_MODEL_OPTIONS: dict[str, tuple[str, ...]] = {
+    "cost": (
+        "nvidia/nemotron-3.5-lightning:free",
+        "google/gemma-4-31b-it:free",
+        "openai/gpt-oss-20b:free",
+    ),
+    "latency": (
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        "poolside/laguna-xs-2.1:free",
+        "google/gemma-4-26b-a4b-it:free",
+    ),
+    "intelligence": (
+        "anthropic/claude-opus-5",
+        "openai/gpt-5.6-sol",
+        "moonshotai/kimi-k3",
+    ),
+}
 
 
 # --- Design system (docs/design/DESIGN.md — Swiss/Grid) ---
@@ -455,6 +472,37 @@ body {
   --q-primary: var(--color-ink) !important;
 }
 
+.demo-prompt-card {
+  display: flex !important;
+  flex-direction: column;
+  min-height: 42rem;
+}
+
+.demo-prompt-input {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.demo-prompt-input .q-field__inner,
+.demo-prompt-input .q-field__control {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 26rem;
+}
+
+.demo-prompt-input .q-field__control-container {
+  min-height: inherit;
+}
+
+.demo-prompt-input .q-field__native,
+.demo-prompt-input textarea {
+  min-height: 26rem !important;
+  max-height: none !important;
+  overflow-y: hidden;
+  resize: vertical;
+}
+
 .demo-strategy-select.q-field--focused .q-field__control {
   box-shadow: inset 0 -2px 0 var(--color-ink) !important;
 }
@@ -484,6 +532,16 @@ body {
   line-height: 1.6;
   max-width: 68ch;
   white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.demo-response-output {
+  min-height: 16rem;
+  max-height: 32rem;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+  scrollbar-color: var(--color-rule) transparent;
+  scrollbar-width: thin;
 }
 
 .demo-response-status {
@@ -496,7 +554,6 @@ body {
 .demo-response-status--success { color: var(--color-success); }
 .demo-response-status--error { color: var(--color-error); }
 .demo-response-status--streaming { color: var(--color-accent); }
-.demo-response-status--fallback { color: var(--color-warning); }
 
 /* --- Status bar — black instrument strip --- */
 
@@ -647,47 +704,23 @@ body {
 
 
 def _format_metadata(value: str | Unavailable) -> str:
-    if isinstance(value, Unavailable):
-        return _UNAVAILABLE_COPY
-    return value
+    return format_trace(value, unavailable=_UNAVAILABLE_COPY)
 
 
 def _format_tokens(value: int | Unavailable) -> str:
-    if isinstance(value, Unavailable):
-        return _UNAVAILABLE_COPY
-    return str(value)
+    return format_number(value, unavailable=_UNAVAILABLE_COPY)
 
 
 def _format_latency(value: int | Unavailable) -> str:
-    if isinstance(value, Unavailable):
-        return _LATENCY_UNAVAILABLE_COPY
-    return f"{value} ms"
+    return format_latency(value, unavailable=_LATENCY_UNAVAILABLE_COPY)
 
 
 def _format_cost(value: float | Unavailable) -> str:
-    if isinstance(value, Unavailable):
-        return _COST_UNAVAILABLE_COPY
-    return f"${value:g}"
+    return format_cost(value, unavailable=_COST_UNAVAILABLE_COPY)
 
 
-def _format_cache_cell(run: InferenceRun | None) -> str:
-    if run is None:
-        return _UNAVAILABLE_COPY
-    telemetry = run.telemetry
-    if telemetry is None:
-        return _UNAVAILABLE_COPY
-    if telemetry.cache_status == "hit":
-        return f"Cache hit ({_format_tokens(telemetry.cached_tokens)} tokens)"
-    if telemetry.cache_status == "write":
-        return f"Cache write ({_format_tokens(telemetry.cache_write_tokens)} tokens)"
-    repeat = run.repeat_observation
-    if repeat is not None:
-        return (
-            f"Observed repeat: {_format_latency(repeat.first.latency_ms)} → "
-            f"{_format_latency(repeat.second.latency_ms)}; "
-            f"{_format_cost(repeat.first.cost_usd)} → {_format_cost(repeat.second.cost_usd)}"
-        )
-    return _UNAVAILABLE_COPY
+def _strategy_with_model(strategy: RoutingStrategy, model_id: str) -> RoutingStrategy:
+    return replace(strategy, model=model_id)
 
 
 def _format_trace_cell(telemetry: TelemetryEvidence | None) -> str:
@@ -737,47 +770,30 @@ EVAL_SCENARIO = (
     "Imagine an AI assistant that instantly drafts thoughtful, impact-aware support replies—acknowledging customer pain points without defensiveness, requesting clear diagnostics, and offering honest next steps. Ishlab’s demo showcases exactly that, helping support staff move faster and smarter."
 )
 
-EVAL_PROOF=(
-    "Make It Reliable: Watch how routing preferences, fallback strategies, and graceful error handling keep your service steady, even under pressure."
-    "Make It Economical: Understand how different model choices impact cost, latency, and token usage—empowering you to optimize for price-performance balance." 
-    "Make Changes Safely: Evaluate models side-by-side with quality scoring, traceability via Langfuse, and data-driven decision-making to pick the best fit for your need"
+EVAL_PROOF = (
+    "Make It Reliable: Watch how routing preferences and graceful error handling keep your service steady, even under pressure.\n"
+    "Make It Economical: Understand how different model choices impact cost, latency, and token usage—empowering you to optimize for price-performance balance.\n"
+    "Make Changes Safely: Evaluate models side-by-side with quality scoring, traceability via Langfuse, and data-driven decision-making to pick the best fit for your need."
 )
 EVAL_DESCRIPTION = (
-    "An angry customer says the API keeps failing and hints they're ready to leave. We score whether the reply holds up."
-    "Leads with the customer's problem — names what they actually lost, before any explanation or caveat."
-    "Asks for real detail — request IDs, timestamps, endpoints. Not 'send more info.'"
-    "Commits to a next step — what happens, who does it, by when."
-    "Promises only what we can keep — no 'this wont happen again, no unauthorized credits."
-    "Doesn't guess at blame — no pointing at the customer's code before the evidence is in."
-    "Gets the scope right — doesn't inflate a hiccup into an outage, or wave off a real one."
+    "An angry customer says the API keeps failing and hints they're ready to leave.\n"
+    "\n"
+    "We score whether the reply holds up.\n"
+    "\n"
+    "Leads with the customer's problem — names what they actually lost, before any explanation or caveat.\n"
+    "Asks for real detail — request IDs, timestamps, endpoints. Not 'send more info.'\n"
+    "Commits to a next step — what happens, who does it, by when.\n"
+    "Promises only what we can keep — no 'this wont happen again, no unauthorized credits.'\n"
+    "Doesn't guess at blame — no pointing at the customer's code before the evidence is in.\n"
+    "Gets the scope right — doesn't inflate a hiccup into an outage, or wave off a real one.\n"
     "Answers the churn signal — addresses 'we are evaluating alternatives' directly, without pleading."
 )
 
-EVAL_SCORING_ROWS = (
-    (
-        "Binary criteria",
-        "ACK, NODEF, DIAG, NEXT, NOGUAR, NOBLAME, SCOPE, RETAIN",
-        "Passes only when every applicable criterion has eviderufnce.",
-    ),
-    (
-        "Tone score",
-        "1-5 judgment for steady, specific, non-template support writing",
-        "Must meet the case's minimum tone target.",
-    ),
-    (
-        "Auto-fail",
-        "Guarantees, unauthorized refunds, blame, or threat-based concessions",
-        "Zeroes the case regardless of other evidence.",
-    ),
-)
 
-EMPTY_RESPONSE = "Run an inference request to see streaming output."
+EMPTY_RESPONSE = "Waiting for prompt to run"
 STREAMING_RESPONSE = "Streaming from OpenRouter..."
 SUCCESS_RESPONSE = "Request completed successfully."
-FAILURE_RESPONSE = "Request failed before fallback could complete."
-FALLBACK_SUCCESS_RESPONSE = "Completed via fallback route after primary route failed."
-SIMULATED_FAILURE_LABEL = "Simulated failure triggered for demo."
-TRACE_DISABLED = "Langfuse tracing disabled. Configure Langfuse credentials to enable trace links."
+FAILURE_RESPONSE = "Request failed."
 
 
 @dataclass
@@ -788,256 +804,11 @@ class _UIState:
     response_status: str = EMPTY_RESPONSE
 
 
-def _telemetry_rows(run: InferenceRun | None, *, is_running: bool = False) -> list[tuple[str, str]]:
-    strategy = (
-        (run.strategy_name or DEFAULT_STRATEGY.name) if run is not None else DEFAULT_STRATEGY.name
-    )
-    if is_running:
-        return [
-            ("Status", STREAMING_RESPONSE),
-            ("Strategy", strategy),
-            ("Model", _format_metadata(Unavailable())),
-            ("Provider", _format_metadata(Unavailable())),
-            ("Latency", _format_latency(Unavailable())),
-            ("Tokens", _format_tokens(Unavailable())),
-            ("Cost", _format_cost(Unavailable())),
-            ("Router", _format_router_cell(None)),
-            ("Cache", _format_cache_cell(None)),
-            ("Trace", _format_trace_cell(None)),
-        ]
-    if run is None:
-        return [
-            ("Status", "Waiting for request."),
-            ("Strategy", strategy),
-            ("Model", _format_metadata(Unavailable())),
-            ("Provider", _format_metadata(Unavailable())),
-            ("Latency", _format_latency(Unavailable())),
-            ("Tokens", _format_tokens(Unavailable())),
-            ("Cost", _format_cost(Unavailable())),
-            ("Router", _format_router_cell(None)),
-            ("Cache", _format_cache_cell(None)),
-            ("Trace", _format_trace_cell(None)),
-        ]
-
-    telemetry = run.telemetry
-    if run.status is Status.FALLBACK_SUCCEEDED:
-        status = FALLBACK_SUCCESS_RESPONSE
-    elif run.status is Status.SUCCEEDED:
-        status = SUCCESS_RESPONSE
-    else:
-        status = FAILURE_RESPONSE
-    rows = [
-        ("Status", status),
-        ("Strategy", strategy),
-        (
-            "Model",
-            _format_metadata(telemetry.model) if telemetry else _format_metadata(Unavailable()),
-        ),
-        (
-            "Provider",
-            _format_metadata(telemetry.provider) if telemetry else _format_metadata(Unavailable()),
-        ),
-        (
-            "Latency",
-            _format_latency(telemetry.latency_ms) if telemetry else _format_latency(Unavailable()),
-        ),
-        (
-            "Tokens",
-            _format_tokens(telemetry.total_tokens) if telemetry else _format_tokens(Unavailable()),
-        ),
-        ("Cost", _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable())),
-        ("Router", _format_router_cell(telemetry)),
-        ("Cache", _format_cache_cell(run)),
-        ("Trace", _format_trace_cell(telemetry)),
-    ]
-    if run.fallback_evidence is not None:
-        fe = run.fallback_evidence
-        rows.append(("Primary status", fe.primary.status.value))
-        rows.append(("Primary error", fe.primary.error_message or _UNAVAILABLE_COPY))
-        rows.append(("Fallback model", _format_metadata(fe.fallback.model)))
-        rows.append(("Fallback status", fe.fallback.status.value))
-        if fe.simulated:
-            rows.append(("Failure type", SIMULATED_FAILURE_LABEL))
-    return rows
-
-
-def _history_cache_label(run: InferenceRun) -> str:
-    telemetry = run.telemetry
-    if telemetry is None:
-        return "—"
-    if telemetry.cache_status == "hit":
-        return f"hit ({_format_tokens(telemetry.cached_tokens)})"
-    if telemetry.cache_status == "write":
-        return f"write ({_format_tokens(telemetry.cache_write_tokens)})"
-    if run.repeat_observation is not None:
-        return "Observed repeat"
-    return "—"
-
-
-def _history_trace_href(run: InferenceRun) -> str | None:
-    telemetry = run.telemetry
-    if telemetry is None:
-        return None
-    if telemetry.trace_status == "enabled" and telemetry.trace_url:
-        return telemetry.trace_url
-    return None
-
-
-def _history_rows(
-    history: RunHistory,
-) -> list[tuple[str, str, str, str, str, str, str, str, str]]:
-    rows: list[tuple[str, str, str, str, str, str, str, str, str]] = []
-    for index, run in enumerate(history.all(), start=1):
-        telemetry = run.telemetry
-        fallback_label = "Yes" if run.fallback_evidence is not None else "—"
-        rows.append(
-            (
-                str(index),
-                run.strategy_name,
-                _format_metadata(telemetry.model) if telemetry else _format_metadata(Unavailable()),
-                _format_metadata(telemetry.provider)
-                if telemetry
-                else _format_metadata(Unavailable()),
-                _format_latency(telemetry.latency_ms)
-                if telemetry
-                else _format_latency(Unavailable()),
-                _format_tokens(telemetry.total_tokens)
-                if telemetry
-                else _format_tokens(Unavailable()),
-                _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable()),
-                fallback_label,
-                _history_cache_label(run),
-            )
-        )
-    return rows
-
-
-def _comparison_runs(history: RunHistory, limit: int = 10) -> list[tuple[int, InferenceRun]]:
-    completed = [
-        (index, run)
-        for index, run in enumerate(history.all(), start=1)
-        if run.status in (Status.SUCCEEDED, Status.FALLBACK_SUCCEEDED)
-    ]
-    return completed[:limit]
-
-
-def _comparison_rows(
-    history: RunHistory, limit: int = 10
-) -> list[tuple[str, str, str, str, str, str]]:
-    rows: list[tuple[str, str, str, str, str, str]] = []
-    for index, run in _comparison_runs(history, limit=limit):
-        telemetry = run.telemetry
-        rows.append(
-            (
-                str(index),
-                _format_metadata(telemetry.model) if telemetry else _format_metadata(Unavailable()),
-                _format_metadata(telemetry.provider)
-                if telemetry
-                else _format_metadata(Unavailable()),
-                _format_latency(telemetry.latency_ms)
-                if telemetry
-                else _format_latency(Unavailable()),
-                _format_cost(telemetry.cost_usd) if telemetry else _format_cost(Unavailable()),
-                _history_cache_label(run),
-            )
-        )
-    return rows
-
-
-def _render_telemetry(run: InferenceRun | None, *, is_running: bool = False) -> None:
-    with ui.card().classes("w-full demo-card"):
-        _heading("Telemetry", level=2, classes="demo-section-heading")
-        with ui.element("div").classes("demo-telemetry-table").props(
-            'role="table" aria-label="Run telemetry"'
-        ):
-            for label, value in _telemetry_rows(run, is_running=is_running):
-                with ui.element("div").classes("demo-telemetry-row").props('role="row"'):
-                    ui.label(label).classes("demo-telemetry-label").props('role="rowheader"')
-                    ui.label(value).classes("demo-telemetry-value").props('role="cell"')
-
-
-def _content_sized_grid_style(column_count: int) -> str:
-    return f"grid-template-columns: repeat({column_count}, max-content);"
-
-
-def _render_history(history: RunHistory) -> None:
-    with ui.card().classes("w-full demo-card"):
-        _heading("Run history", level=2, classes="demo-section-heading")
-        rows = _history_rows(history)
-        if not rows:
-            ui.label(
-                "Previous runs will appear here for route, fallback, cost, latency, cache, and trace review."
-            ).classes("demo-supporting")
-            return
-        columns = ("Run", "Strategy", "Model", "Provider", "Latency", "Tokens", "Cost", "Fallback", "Cache")
-        grid_style = _content_sized_grid_style(len(columns))
-        with ui.element("div").classes("demo-grid-scroll").props(
-            'role="table" aria-label="Run history"'
-        ), ui.grid(columns=len(columns)).classes("w-full").style(grid_style):
-            for column in columns:
-                ui.label(column).classes("demo-grid-header").props('role="columnheader"')
-            for row, run in zip(rows, history.all(), strict=True):
-                trace_href = _history_trace_href(run)
-                for cell_index, value in enumerate(row):
-                    with ui.element("div").classes("demo-grid-cell").props('role="cell"'):
-                        if cell_index == 0 and trace_href is not None:
-                            ui.link(value, trace_href, new_tab=True).classes("demo-grid-link")
-                            ui.tooltip(f"Open trace: {trace_href}")
-                        else:
-                            ui.label(value)
-                            ui.tooltip(value)
-
-
-def _render_comparison(history: RunHistory) -> None:
-    with ui.card().classes("w-full demo-card"):
-        _heading("Comparison", level=2, classes="demo-section-heading")
-        comparison = _comparison_rows(history)
-        if not comparison:
-            ui.label(
-                "Successful runs will appear here for side-by-side cost, latency, and cache comparison."
-            ).classes("demo-supporting")
-            return
-        comparison_columns = ("Run", "Model", "Provider", "Latency", "Cost", "Cache")
-        comparison_runs = _comparison_runs(history)
-        grid_style = _content_sized_grid_style(len(comparison_columns))
-        with ui.element("div").classes("demo-grid-scroll").props(
-            'role="table" aria-label="Run comparison"'
-        ), ui.grid(columns=len(comparison_columns)).classes("w-full").style(grid_style):
-            for column in comparison_columns:
-                ui.label(column).classes("demo-grid-header").props('role="columnheader"')
-            for row, (_, run) in zip(comparison, comparison_runs, strict=True):
-                trace_href = _history_trace_href(run)
-                for cell_index, value in enumerate(row):
-                    with ui.element("div").classes("demo-grid-cell").props('role="cell"'):
-                        if cell_index == 0 and trace_href is not None:
-                            ui.link(value, trace_href, new_tab=True).classes("demo-grid-link")
-                            ui.tooltip(f"Open trace: {trace_href}")
-                        else:
-                            ui.label(value)
-                            ui.tooltip(value)
-
-
-def _render_eval_scoring_table() -> None:
-    columns = ("Scoring layer", "What the judge looks for", "Pass/fail meaning")
-    with ui.element("div").classes("demo-grid-scroll").props(
-        'role="table" aria-label="Eval scoring rubric"'
-    ), ui.grid(columns=len(columns)).classes("w-full").style(
-        _content_sized_grid_style(len(columns))
-    ):
-        for column in columns:
-            ui.label(column).classes("demo-grid-header").props('role="columnheader"')
-        for row in EVAL_SCORING_ROWS:
-            for value in row:
-                with ui.element("div").classes("demo-grid-cell").props('role="cell"'):
-                    ui.label(value)
-                    ui.tooltip(value)
-
-
 async def _run_inference(
     prompt: str,
     *,
     api_key: str,
-    history: RunHistory,
+    history: SQLiteRunHistory,
     stream_fn: StreamFn = stream_chat_completion,
     strategy: RoutingStrategy = DEFAULT_STRATEGY,
     config: AppConfig | None = None,
@@ -1138,256 +909,17 @@ async def _run_inference(
     return run
 
 
-async def _run_fallback_inference(
-    prompt: str,
-    *,
-    api_key: str,
-    history: RunHistory,
-    fallback_strategy: RoutingStrategy,
-    stream_fn: StreamFn = stream_chat_completion,
-    config: AppConfig | None = None,
-) -> InferenceRun:
-    prompt = prompt.strip()
-    if not prompt:
-        raise ValueError("Prompt must not be blank.")
-
-    started_at = datetime.now(UTC)
-    text_parts: list[str] = []
-    fallback_result: StreamedResult | None = None
-    primary_record: AttemptRecord | None = None
-
-    async for event in run_fallback_scenario(
-        prompt,
-        fallback_strategy=fallback_strategy,
-        api_key=api_key,
-        stream_fn=stream_fn,
-    ):
-        if isinstance(event, StreamChunk):
-            text_parts.append(event.text_delta)
-        elif isinstance(event, FallbackResult):
-            primary_record = event.primary
-            fallback_result = event.fallback
-
-    if fallback_result is None or primary_record is None:
-        # Edge case: primary unexpectedly succeeded — treat as normal run
-        run = InferenceRun(
-            run_id=uuid.uuid4().hex,
-            prompt=prompt,
-            strategy_name=fallback_strategy.name,
-            started_at=started_at,
-            completed_at=datetime.now(UTC),
-            status=Status.SUCCEEDED,
-            streamed_text="".join(text_parts),
-            error_message=None,
-            telemetry=None,
-        )
-        history.append(run)
-        return run
-
-    trace_status: str | Unavailable = UNAVAILABLE
-    trace_id: str | None = None
-    trace_url: str | None = None
-    if config is not None:
-        model_for_trace = (
-            fallback_result.model
-            if not isinstance(fallback_result.model, Unavailable)
-            else fallback_strategy.model
-        )
-        usage_details: dict[str, int] = {}
-        if not isinstance(fallback_result.prompt_tokens, Unavailable):
-            usage_details["prompt_tokens"] = fallback_result.prompt_tokens
-        if not isinstance(fallback_result.completion_tokens, Unavailable):
-            usage_details["completion_tokens"] = fallback_result.completion_tokens
-        outcome = record_trace(
-            config=config,
-            name="openrouter-inference",
-            model=model_for_trace,
-            input={"prompt": prompt},
-            output=fallback_result.text,
-            usage_details=usage_details,
-        )
-        trace_status = outcome.status
-        trace_id = outcome.trace_id
-        trace_url = outcome.trace_url
-
-    telemetry = TelemetryEvidence(
-        model=fallback_result.model,
-        provider=fallback_result.provider,
-        latency_ms=fallback_result.latency_ms,
-        prompt_tokens=fallback_result.prompt_tokens,
-        completion_tokens=fallback_result.completion_tokens,
-        total_tokens=fallback_result.total_tokens,
-        cost_usd=fallback_result.cost_usd,
-        cache_status=fallback_result.cache_status,
-        cached_tokens=fallback_result.cached_tokens,
-        cache_write_tokens=fallback_result.cache_write_tokens,
-        openrouter_metadata=fallback_result.openrouter_metadata,
-        trace_status=trace_status,
-        trace_id=trace_id,
-        trace_url=trace_url,
-    )
-    fallback_attempt_record = AttemptRecord(
-        model=fallback_result.model,
-        provider=fallback_result.provider,
-        status=Status.SUCCEEDED,
-        error_message=None,
-        latency_ms=fallback_result.latency_ms,
-        prompt_tokens=fallback_result.prompt_tokens,
-        completion_tokens=fallback_result.completion_tokens,
-        total_tokens=fallback_result.total_tokens,
-        cost_usd=fallback_result.cost_usd,
-    )
-    evidence = FallbackEvidence(
-        primary=primary_record,
-        fallback=fallback_attempt_record,
-        simulated=True,
-    )
-    run = InferenceRun(
-        run_id=uuid.uuid4().hex,
-        prompt=prompt,
-        strategy_name=fallback_strategy.name,
-        started_at=started_at,
-        completed_at=datetime.now(UTC),
-        status=Status.FALLBACK_SUCCEEDED,
-        streamed_text=fallback_result.text or "".join(text_parts),
-        error_message=None,
-        telemetry=telemetry,
-        fallback_evidence=evidence,
-    )
-    history.append(run)
-    return run
-
-
-async def _run_repeat_inference(
-    prompt: str,
-    *,
-    api_key: str,
-    history: RunHistory,
-    strategy: RoutingStrategy,
-    config: AppConfig,
-    stream_fn: StreamFn = stream_chat_completion,
-) -> InferenceRun:
-    prompt = prompt.strip()
-    if not prompt:
-        raise ValueError("Prompt must not be blank.")
-
-    started_at = datetime.now(UTC)
-    text_parts: list[str] = []
-    repeat: RepeatObservation | None = None
-
-    try:
-        async for event in run_repeat_scenario(
-            prompt,
-            strategy=strategy,
-            api_key=api_key,
-            stream_fn=stream_fn,
-        ):
-            if isinstance(event, StreamChunk):
-                text_parts.append(event.text_delta)
-            elif isinstance(event, RepeatObservation):
-                repeat = event
-    except OpenRouterError as exc:
-        run = InferenceRun(
-            run_id=uuid.uuid4().hex,
-            prompt=prompt,
-            strategy_name=strategy.name,
-            started_at=started_at,
-            completed_at=datetime.now(UTC),
-            status=Status.FAILED,
-            streamed_text=exc.partial_text or "".join(text_parts),
-            error_message=str(exc),
-            telemetry=None,
-        )
-        history.append(run)
-        return run
-
-    if repeat is None:
-        run = InferenceRun(
-            run_id=uuid.uuid4().hex,
-            prompt=prompt,
-            strategy_name=strategy.name,
-            started_at=started_at,
-            completed_at=datetime.now(UTC),
-            status=Status.FAILED,
-            streamed_text="".join(text_parts),
-            error_message="Repeat scenario ended without a final observation.",
-            telemetry=None,
-        )
-        history.append(run)
-        return run
-
-    second = repeat.second
-    trace_status: str | Unavailable = UNAVAILABLE
-    trace_id: str | None = None
-    trace_url: str | None = None
-    model_for_trace = second.model if not isinstance(second.model, Unavailable) else strategy.model
-    usage_details: dict[str, int] = {}
-    if not isinstance(second.prompt_tokens, Unavailable):
-        usage_details["prompt_tokens"] = second.prompt_tokens
-    if not isinstance(second.completion_tokens, Unavailable):
-        usage_details["completion_tokens"] = second.completion_tokens
-    outcome = record_trace(
-        config=config,
-        name="openrouter-inference",
-        model=model_for_trace,
-        input={"prompt": prompt},
-        output=second.text,
-        usage_details=usage_details,
-    )
-    trace_status = outcome.status
-    trace_id = outcome.trace_id
-    trace_url = outcome.trace_url
-
-    telemetry = TelemetryEvidence(
-        model=second.model,
-        provider=second.provider,
-        latency_ms=second.latency_ms,
-        prompt_tokens=second.prompt_tokens,
-        completion_tokens=second.completion_tokens,
-        total_tokens=second.total_tokens,
-        cost_usd=second.cost_usd,
-        cache_status=repeat.cache_status,
-        cached_tokens=repeat.cached_tokens,
-        cache_write_tokens=repeat.cache_write_tokens,
-        openrouter_metadata=second.openrouter_metadata,
-        trace_status=trace_status,
-        trace_id=trace_id,
-        trace_url=trace_url,
-    )
-    run = InferenceRun(
-        run_id=uuid.uuid4().hex,
-        prompt=prompt,
-        strategy_name=strategy.name,
-        started_at=started_at,
-        completed_at=datetime.now(UTC),
-        status=Status.SUCCEEDED,
-        streamed_text=second.text or "".join(text_parts),
-        error_message=None,
-        telemetry=telemetry,
-        repeat_observation=repeat,
-    )
-    history.append(run)
-    return run
-
-
-def _status_item(label: str, ready: bool, detail: str) -> None:
-    dot_class = "demo-status-dot--ready" if ready else "demo-status-dot--warning"
-    short_detail = "Ready" if ready else "Needs setup"
-    with ui.element("div").classes("demo-status-item").props(f'aria-label="{label}: {detail}"'):
-        ui.element("div").classes(f"demo-status-dot {dot_class}")
-        ui.label(label).classes("demo-status-item-label")
-        ui.label(short_detail).classes("demo-status-item-label")
-
-
 def build_app(
     config: AppConfig,
-    history: RunHistory,
+    history: SQLiteRunHistory,
     *,
     stream_fn: StreamFn = stream_chat_completion,
 ) -> None:
     ui.page_title("ishlab Production Inference Lab")
     ui.add_head_html('<link rel="icon" href="assets/favicon.ico" type="image/x-icon">')
     state = _UIState()
+    initial_strategy_name = next(iter(STRATEGIES))
+    model_options: tuple[str, ...] = STRATEGY_MODEL_OPTIONS[initial_strategy_name]
 
     # Mount static assets for avatar and logo
     assets_dir = Path(__file__).parent.parent.parent / "assets"
@@ -1396,7 +928,10 @@ def build_app(
 
     def sync_run_button() -> None:
         disabled = (
-            not config.openrouter_ready or state.is_running or not str(prompt.value or "").strip()
+            not config.openrouter_ready
+            or state.is_running
+            or not str(prompt.value or "").strip()
+            or not str(model_select.value or "").strip()
         )
         if disabled:
             run_button.disable()
@@ -1405,32 +940,18 @@ def build_app(
 
     @ui.refreshable
     def response_panel() -> None:
-        with ui.card().classes("w-full demo-card"):
-            _heading("Streaming response", level=2, classes="demo-section-heading")
-            status_class = "demo-response-status"
-            if state.is_running:
-                status_class += " demo-response-status--streaming"
-            elif state.last_run is not None:
-                if state.last_run.status is Status.FALLBACK_SUCCEEDED:
-                    status_class += " demo-response-status--fallback"
-                elif state.last_run.status is Status.SUCCEEDED:
-                    status_class += " demo-response-status--success"
-                else:
-                    status_class += " demo-response-status--error"
-            ui.label(state.response_status).classes(status_class)
+        _heading("LLM Response", level=2, classes="demo-section-heading")
+        status_class = "demo-response-status"
+        if state.is_running:
+            status_class += " demo-response-status--streaming"
+        elif state.last_run is not None:
+            if state.last_run.status in (Status.SUCCEEDED, Status.FALLBACK_SUCCEEDED):
+                status_class += " demo-response-status--success"
+            else:
+                status_class += " demo-response-status--error"
+        ui.label(state.response_status).classes(status_class)
+        with ui.element("div").classes("demo-response-output"):
             ui.label(state.response or EMPTY_RESPONSE).classes("demo-response-text")
-
-    @ui.refreshable
-    def telemetry_panel() -> None:
-        _render_telemetry(state.last_run, is_running=state.is_running)
-
-    @ui.refreshable
-    def history_panel() -> None:
-        _render_history(history)
-
-    @ui.refreshable
-    def comparison_panel() -> None:
-        _render_comparison(history)
 
     def refresh(panel: object) -> None:
         cast(Any, panel).refresh()
@@ -1439,7 +960,8 @@ def build_app(
         if not config.openrouter_ready or state.is_running:
             return
         prompt_text = str(prompt.value or "").strip()
-        if not prompt_text:
+        model_id = str(model_select.value or "").strip()
+        if not prompt_text or not model_id:
             sync_run_button()
             return
 
@@ -1448,7 +970,6 @@ def build_app(
         state.response_status = STREAMING_RESPONSE
         sync_run_button()
         refresh(response_panel)
-        refresh(telemetry_panel)
 
         async def observed_stream(
             prompt_value: str, **kwargs: object
@@ -1459,31 +980,22 @@ def build_app(
                     refresh(response_panel)
                 yield event
 
-        selected_strategy = STRATEGIES.get(strategy_select.value, DEFAULT_STRATEGY)
-        if repeat_enabled.value:
-            run = await _run_repeat_inference(
-                prompt_text,
-                api_key=os.environ.get(OPENROUTER_API_KEY, ""),
-                history=history,
-                strategy=selected_strategy,
-                config=config,
-                stream_fn=observed_stream,
-            )
-        else:
-            run = await _run_inference(
-                prompt_text,
-                api_key=os.environ.get(OPENROUTER_API_KEY, ""),
-                history=history,
-                stream_fn=observed_stream,
-                strategy=selected_strategy,
-                config=config,
-            )
+        selected_strategy = _strategy_with_model(
+            STRATEGIES.get(strategy_select.value, INTELLIGENCE_STRATEGY),
+            model_id,
+        )
+        run = await _run_inference(
+            prompt_text,
+            api_key=os.environ.get(OPENROUTER_API_KEY, ""),
+            history=history,
+            stream_fn=observed_stream,
+            strategy=selected_strategy,
+            config=config,
+        )
         state.is_running = False
         state.last_run = run
         state.response = run.streamed_text
-        if run.status is Status.FALLBACK_SUCCEEDED:
-            state.response_status = FALLBACK_SUCCESS_RESPONSE
-        elif run.status is Status.SUCCEEDED:
+        if run.status in (Status.SUCCEEDED, Status.FALLBACK_SUCCEEDED):
             state.response_status = SUCCESS_RESPONSE
         else:
             state.response_status = FAILURE_RESPONSE
@@ -1507,14 +1019,44 @@ def build_app(
                 ui.label("ishlab").classes("demo-brand-label")
             _heading("Production Inference Lab", level=1, classes="demo-page-title")
 
-        ui.label("The app runs live streaming inference, exposes routing/fallback/cost/latency/cache-or-repeat evidence runs to Langfuse, and runs a three-to-five-case deterministic eval set. ").classes("demo-supporting")
-        ui.label("This demo shows what changes when inference becomes something you have to operate in production: routing, fallback, latency, cost, traces, and evals.").classes(
-            "demo-supporting"
-        )
+        ui.label(
+            "The app runs live streaming inference, exposes routing, cost, latency, token, and trace evidence, and runs a three-to-five-case deterministic eval set. "
+        ).classes("demo-supporting")
+        ui.label(
+            "This demo shows what changes when inference becomes something you have to operate in production: routing, latency, cost, traces, and evals."
+        ).classes("demo-supporting")
 
-        # Compact inline status bar
-        with ui.element("div").classes("demo-status-bar").props(
-            'role="status" aria-label="Credential status"'
+        # Request panel with section dividers
+        with ui.card().classes("w-full demo-card"):
+            _heading(
+                "Experience how prompt routing, traceability, and evaluation come together",
+                level=3,
+                classes="text-section-heading",
+            )
+            _heading("Prompt Evaluation Scenario", level=5, classes="text-section-heading")
+            # ui.html preserves the \n line breaks via whitespace-pre-line
+            ui.html(EVAL_SCENARIO).classes("demo-body").style("white-space: pre-line;")
+            _heading("Prompt Evaluation Description", level=5, classes="text-section-heading")
+            ui.html(EVAL_DESCRIPTION).classes("demo-body").style("white-space: pre-line;")
+            _heading(
+                "Real-World Scenarios That Prove It Works", level=4, classes="text-section-heading"
+            )
+            ui.html(EVAL_PROOF).classes("demo-body").style("white-space: pre-line;")
+            _heading("Eval Scorecard", level=4, classes="text-section-heading")
+
+    def _status_item(label: str, ready: bool, detail: str) -> None:
+        dot_class = "demo-status-dot--ready" if ready else "demo-status-dot--warning"
+        short_detail = "Ready" if ready else "Needs setup"
+        with ui.element("div").classes("demo-status-item").props(f'aria-label="{label}: {detail}"'):
+            ui.element("div").classes(f"demo-status-dot {dot_class}")
+            ui.label(label).classes("demo-status-item-label")
+            ui.label(short_detail).classes("demo-status-item-label")
+
+            # Compact inline status bar
+        with (
+            ui.element("div")
+            .classes("demo-status-bar")
+            .props('role="status" aria-label="Credential status"')
         ):
             _status_item(
                 "OpenRouter",
@@ -1526,78 +1068,94 @@ def build_app(
             _status_item(
                 "Langfuse tracing",
                 config.langfuse_ready,
-                TRACE_DISABLED
+                "Optional tracing credentials are present; values are not displayed."
                 if not config.langfuse_ready
-                else "Optional tracing credentials are present; values are not displayed.",
+                else "Required credential is present; value is not displayed.",
             )
 
-        # Request panel with section dividers
-        with ui.card().classes("w-full demo-card"):
-            _heading("Experience how prompt routing, traceability, and evaluation come together", level=1, classes="demo-component-heading")
-            _heading("Prompt Evaluation Scenario", level=3, classes="demo-component-heading")
-            ui.label(EVAL_SCENARIO).classes("demo-body")
-            _heading("Prompt Evaluation Description", level=3, classes="demo-component-heading")
-            ui.label(EVAL_DESCRIPTION).classes("demo-body")
-            _heading("Real-World Scenarios That Prove It Works", level=2, classes="demo-component-heading")
-            ui.label(EVAL_PROOF).classes("demo-body")
-            _heading("Prompt", level=3, classes="demo-component-heading")
-            prompt = ui.textarea(
-                placeholder="Draft or revise a support reply to an API reliability complaint...",
-                on_change=lambda _: sync_run_button(),
-            ).classes("w-full").props('aria-label="Prompt"')
-            ui.label("Sample prompt").classes("demo-label")
-            with ui.row().classes("w-full gap-2 flex-wrap"):
-                for sample in SAMPLE_PROMPTS:
-                    ui.button(
-                        sample.label,
-                        on_click=lambda sample=sample: fill_prompt(sample.prompt),
-                    ).props("flat").classes("demo-btn-secondary").style(
-                        "--q-primary: var(--color-sample-button-text);"
+        with ui.row().classes("w-full items-stretch gap-6 flex-wrap"):
+            with ui.card().classes("flex-1 demo-card demo-prompt-card"):
+                _heading("Prompt", level=2, classes="demo-section-heading")
+                prompt = (
+                    ui.textarea(
+                        placeholder="Draft or revise a support reply to an API reliability complaint...",
+                        on_change=lambda _: sync_run_button(),
                     )
+                    .classes("w-full demo-prompt-input")
+                    .props('aria-label="Prompt" autogrow rows=18')
+                )
+                ui.label("Sample prompt").classes("demo-label")
+                with ui.row().classes("w-full gap-2 flex-wrap"):
+                    for sample in SAMPLE_PROMPTS:
+                        ui.button(
+                            sample.label,
+                            on_click=lambda sample=sample: fill_prompt(sample.prompt),
+                        ).props("flat").classes("demo-btn-secondary").style(
+                            "--q-primary: var(--color-sample-button-text);"
+                        )
 
-            ui.element("div").classes("demo-section-divider")
+                    ui.element("div").classes("demo-section-divider")
 
-            _heading("Strategy", level=2, classes="demo-component-heading")
-            strategy_select = ui.select(
-                options={s.name: ROUTING_STRATEGY_LABELS[s.name] for s in STRATEGIES.values()},
-                value=DEFAULT_STRATEGY.name,
-            ).classes("w-full demo-strategy-select").props(
-                'aria-label="Routing strategy" popup-content-class=demo-strategy-menu'
-            ).style("--q-primary: var(--color-ink);")
-            strategy_description_label = ui.label(DEFAULT_STRATEGY.description).classes(
-                "demo-strategy-desc"
-            )
+                _heading("Model Choice Strategy", level=2, classes="demo-component-heading")
+                strategy_select = (
+                    ui.select(
+                        options={
+                            s.name: ROUTING_STRATEGY_LABELS[s.name] for s in STRATEGIES.values()
+                        },
+                        value=initial_strategy_name,
+                    )
+                    .classes("w-full demo-strategy-select")
+                    .props('aria-label="Routing strategy" popup-content-class=demo-strategy-menu')
+                    .style("--q-primary: var(--color-ink);")
+                )
+                strategy_description_label = ui.label(
+                    STRATEGIES[initial_strategy_name].description
+                ).classes("demo-strategy-desc")
 
-            def update_strategy_description(_: object) -> None:
-                selected = STRATEGIES.get(strategy_select.value, DEFAULT_STRATEGY)
-                strategy_description_label.text = selected.description
+                def update_strategy_description(_: object) -> None:
+                    selected = STRATEGIES.get(strategy_select.value, INTELLIGENCE_STRATEGY)
+                    strategy_description_label.text = selected.description
+                    model_select.options = STRATEGY_MODEL_OPTIONS[selected.name]
+                    model_select.value = None
+                    model_select.update()
+                    sync_run_button()
 
-            strategy_select.on("update:model-value", update_strategy_description)
+                strategy_select.on("update:model-value", update_strategy_description)
 
-            ui.element("div").classes("demo-section-divider")
+                ui.element("div").classes("demo-section-divider")
 
-            with ui.column().classes("gap-1"):
-                repeat_enabled = ui.switch("Repeat previous prompt", value=False)
+                _heading("Model", level=2, classes="demo-component-heading")
+                model_select = (
+                    ui.select(
+                        options=model_options,
+                        value=None,
+                    )
+                    .classes("w-full demo-strategy-select")
+                    .props('aria-label="Model" popup-content-class=demo-strategy-menu clearable')
+                    .style("--q-primary: var(--color-ink);")
+                )
+                model_select.on("update:model-value", lambda _: sync_run_button())
                 ui.label(
-                    "Runs the same prompt twice and reports cache evidence or latency/cost delta."
-                ).classes("demo-toggle-help")
-            run_button = ui.button("Run Inference", on_click=run_request).classes(
-                "demo-btn-primary"
-            ).props("unelevated").style("--q-primary: var(--color-accent);")
-            run_button.disable()
+                    "Choose one of the three hard-coded models for the selected strategy."
+                ).classes("demo-strategy-desc")
 
-        # Response panel (full width)
-        response_panel()
+                ui.element("div").classes("demo-section-divider")
+
+                with ui.column().classes("gap-1"):
+                    run_button = (
+                        ui.button("Run Inference", on_click=run_request)
+                        .classes("demo-btn-primary")
+                        .props("unelevated")
+                        .style("--q-primary: var(--color-accent);")
+                    )
+                    run_button.disable()
+
+            # Response panel (side by side with prompt card)
+            with ui.card().classes("flex-1 demo-card"):
+                response_panel()
 
         # Tabbed evidence: Telemetry + Run History + Comparison
         with ui.tabs().props("align=left").classes("w-full demo-tabs") as tabs:
             ui.tab("Telemetry")
             ui.tab("Run History")
             ui.tab("Comparison")
-        with ui.tab_panels(tabs, value="Telemetry").classes("w-full"):
-            with ui.tab_panel("Telemetry"):
-                telemetry_panel()
-            with ui.tab_panel("Run History"):
-                history_panel()
-            with ui.tab_panel("Comparison"):
-                comparison_panel()

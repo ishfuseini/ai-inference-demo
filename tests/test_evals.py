@@ -240,7 +240,7 @@ def test_main_runs_end_to_end_with_fake_stream(monkeypatch, capsys) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
 
     async def fake_stream(
-        prompt: str, *, strategy=None, model=None, api_key=None
+        prompt: str, *, strategy=None, api_key=None
     ) -> AsyncIterator[StreamChunk | StreamedResult]:
         yield _result()
 
@@ -250,7 +250,7 @@ def test_main_runs_end_to_end_with_fake_stream(monkeypatch, capsys) -> None:
     )
     assert main(["--limit", "1"]) == 0
     out = capsys.readouterr().out
-    assert "default" in out
+    assert "intelligence" in out
     assert "cost" in out
 
 
@@ -306,23 +306,6 @@ def test_format_summary_json_is_parseable(monkeypatch) -> None:
     assert len(doc["results"]) == 5 * 2
 
 
-def test_run_eval_set_uses_models_override(monkeypatch) -> None:
-    monkeypatch.setattr(
-        evals_mod, "record_trace", lambda **kwargs: TraceOutcome("disabled", None, None)
-    )
-    models = ("openai/gpt-4o-mini", "meta-llama/llama-3.1-8b-instruct")
-    summary = _run(
-        run_eval_set(
-            [_case("c1")],
-            models=models,
-            api_key="sk-test",
-            config=load_config({}),
-            stream_fn=_fake_stream(_result()),
-        )
-    )
-    assert {r.strategy_name for r in summary.results} == set(models)
-
-
 def test_main_exits_1_on_unreadable_cases(monkeypatch) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     assert main(["--cases", "does-not-exist.json"]) == 1
@@ -348,9 +331,9 @@ def test_main_limit_caps_cases(monkeypatch) -> None:
     calls: list[tuple[object, object]] = []
 
     async def fake_stream(
-        prompt: str, *, strategy=None, model=None, api_key=None
+        prompt: str, *, strategy=None, api_key=None
     ) -> AsyncIterator[StreamChunk | StreamedResult]:
-        calls.append((strategy, model))
+        calls.append(strategy)
         yield _result()
 
     monkeypatch.setattr(evals_mod, "stream_chat_completion", fake_stream)
@@ -361,30 +344,11 @@ def test_main_limit_caps_cases(monkeypatch) -> None:
     assert len(calls) == 2  # 1 case x 2 strategies
 
 
-def test_main_models_override_strategies(monkeypatch) -> None:
-    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
-    calls: list[tuple[object, object]] = []
-
-    async def fake_stream(
-        prompt: str, *, strategy=None, model=None, api_key=None
-    ) -> AsyncIterator[StreamChunk | StreamedResult]:
-        calls.append((strategy, model))
-        yield _result()
-
-    monkeypatch.setattr(evals_mod, "stream_chat_completion", fake_stream)
-    monkeypatch.setattr(
-        evals_mod, "record_trace", lambda **kwargs: TraceOutcome("disabled", None, None)
-    )
-    assert main(["--models", "a/b,c/d"]) == 0
-    assert all(strategy is None for strategy, _model in calls)
-    assert {model for _, model in calls} == {"a/b", "c/d"}
-
-
 def test_main_json_only_stdout(monkeypatch, capsys) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
 
     async def fake_stream(
-        prompt: str, *, strategy=None, model=None, api_key=None
+        prompt: str, *, strategy=None, api_key=None
     ) -> AsyncIterator[StreamChunk | StreamedResult]:
         yield _result()
 

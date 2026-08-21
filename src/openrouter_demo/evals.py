@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from openrouter_demo.client import OpenRouterError, stream_chat_completion
 from openrouter_demo.config import AppConfig, load_config
+from openrouter_demo.formatting import format_cost, format_latency, format_number, format_trace
 from openrouter_demo.models import (
     StreamChunk,
     StreamedResult,
@@ -98,23 +99,17 @@ def load_cases(path: str = "evals/cases.json") -> list[EvalCase]:
 async def run_eval_case(
     case: EvalCase,
     *,
-    strategy: RoutingStrategy | None = None,
-    model: str | None = None,
+    strategy: RoutingStrategy,
     api_key: str,
     config: AppConfig,
     stream_fn: StreamFn = stream_chat_completion,
 ) -> EvalResult:
-    strategy_name = strategy.name if strategy is not None else (model or "")
+    strategy_name = strategy.name
     final_result: StreamedResult | None = None
     try:
-        if strategy is not None:
-            async for event in stream_fn(case.prompt, strategy=strategy, api_key=api_key):
-                if isinstance(event, StreamedResult):
-                    final_result = event
-        else:
-            async for event in stream_fn(case.prompt, model=model, api_key=api_key):
-                if isinstance(event, StreamedResult):
-                    final_result = event
+        async for event in stream_fn(case.prompt, strategy=strategy, api_key=api_key):
+            if isinstance(event, StreamedResult):
+                final_result = event
     except OpenRouterError as exc:
         return EvalResult(case.case_id, "", strategy_name, False, str(exc), (), (), (), None)
 
@@ -134,7 +129,7 @@ async def run_eval_case(
     model_for_trace = (
         final_result.model
         if not isinstance(final_result.model, Unavailable)
-        else (strategy.model if strategy is not None else (model or "unknown"))
+        else strategy.model
     )
     usage_details: dict[str, int] = {}
     if not isinstance(final_result.prompt_tokens, Unavailable):
@@ -185,53 +180,36 @@ async def run_eval_case(
 async def run_eval_set(
     cases: list[EvalCase],
     *,
-    strategies: tuple[RoutingStrategy, ...] = (),
-    models: tuple[str, ...] = (),
+    strategies: tuple[RoutingStrategy, ...],
     api_key: str,
     config: AppConfig,
     stream_fn: StreamFn = stream_chat_completion,
 ) -> EvalSummary:
     results: list[EvalResult] = []
     for case in cases:
-        if models:
-            for model_id in models:
-                results.append(
-                    await run_eval_case(
-                        case, model=model_id, api_key=api_key, config=config, stream_fn=stream_fn
-                    )
+        for strategy in strategies:
+            results.append(
+                await run_eval_case(
+                    case, strategy=strategy, api_key=api_key, config=config, stream_fn=stream_fn
                 )
-        else:
-            for strategy in strategies:
-                results.append(
-                    await run_eval_case(
-                        case, strategy=strategy, api_key=api_key, config=config, stream_fn=stream_fn
-                    )
-                )
+            )
     return EvalSummary(tuple(results))
 
 
 def _fmt_cost(value: float | Unavailable | None) -> str:
-    if isinstance(value, Unavailable) or value is None:
-        return "unavailable"
-    return f"${value:g}"
+    return format_cost(value, unavailable="unavailable")
 
 
 def _fmt_num(value: float | Unavailable | None) -> str:
-    if isinstance(value, Unavailable) or value is None:
-        return "unavailable"
-    return f"{value:g}"
+    return format_number(value, unavailable="unavailable")
 
 
 def _fmt_latency(value: float | Unavailable | None) -> str:
-    if isinstance(value, Unavailable) or value is None:
-        return "unavailable"
-    return f"{value:g} ms"
+    return format_latency(value, unavailable="unavailable")
 
 
 def _fmt_trace(value: str | Unavailable | None) -> str:
-    if isinstance(value, Unavailable) or value is None:
-        return "unavailable"
-    return value
+    return format_trace(value, unavailable="unavailable")
 
 
 def _aggregate(results: list[EvalResult]) -> dict[str, object]:
@@ -346,12 +324,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--cases", default="evals/cases.json", help="path to cases JSON")
     parser.add_argument(
-        "--strategies", default="default,cost", help="comma-separated STRATEGIES keys"
-    )
-    parser.add_argument(
-        "--models",
-        default=None,
-        help="comma-separated model ids (overrides --strategies)",
+        "--strategies", default="intelligence,cost", help="comma-separated STRATEGIES keys"
     )
     parser.add_argument("--limit", type=int, default=0, help="run at most N cases (0 = all)")
     parser.add_argument("--json", action="store_true", help="emit JSON instead of a table")
@@ -367,24 +340,16 @@ def main(argv: list[str] | None = None) -> int:
 
         args = build_parser().parse_args(argv)
 
-        strategies: tuple[RoutingStrategy, ...] = ()
-        models: tuple[str, ...] = ()
-        if args.models:
-            models = tuple(part.strip() for part in args.models.split(",") if part.strip())
-            if not models:
-                print("No models specified.", file=sys.stderr)
-                return 1
-        else:
-            try:
-                strategies = tuple(
-                    STRATEGIES[part.strip()] for part in args.strategies.split(",") if part.strip()
-                )
-            except KeyError as exc:
-                print(f"Unknown strategy: {exc.args[0]}", file=sys.stderr)
-                return 1
-            if not strategies:
-                print("No strategies specified.", file=sys.stderr)
-                return 1
+        try:
+            strategies = tuple(
+                STRATEGIES[part.strip()] for part in args.strategies.split(",") if part.strip()
+            )
+        except KeyError as exc:
+            print(f"Unknown strategy: {exc.args[0]}", file=sys.stderr)
+            return 1
+        if not strategies:
+            print("No strategies specified.", file=sys.stderr)
+            return 1
 
         try:
             cases = load_cases(args.cases)
@@ -400,7 +365,6 @@ def main(argv: list[str] | None = None) -> int:
             run_eval_set(
                 cases,
                 strategies=strategies,
-                models=models,
                 api_key=api_key,
                 config=config,
                 stream_fn=stream_chat_completion,

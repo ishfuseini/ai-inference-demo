@@ -3,6 +3,7 @@ from openrouter_demo.routing import (
     COST_STRATEGY,
     DEFAULT_STRATEGY,
     FALLBACK_PRIMARY_STRATEGY,
+    INTELLIGENCE_STRATEGY,
     LATENCY_STRATEGY,
     STRATEGIES,
     strategy_payload,
@@ -27,6 +28,11 @@ def test_latency_strategy_payload_includes_latency_sort() -> None:
     assert payload["provider"] == {"sort": "latency"}
 
 
+def test_intelligence_strategy_payload_has_no_provider_sort() -> None:
+    payload = strategy_payload(INTELLIGENCE_STRATEGY)
+    assert payload == {"model": "anthropic/claude-opus-5"}
+
+
 def test_fallback_primary_strategy_payload_includes_allow_fallbacks_false() -> None:
     payload = strategy_payload(FALLBACK_PRIMARY_STRATEGY)
     assert payload["model"] == "nonexistent/fake-model-for-demo"
@@ -34,10 +40,10 @@ def test_fallback_primary_strategy_payload_includes_allow_fallbacks_false() -> N
 
 
 def test_strategies_dict_contains_three_selectable_strategies() -> None:
-    assert set(STRATEGIES.keys()) == {"default", "cost", "latency"}
-    assert STRATEGIES["default"] is DEFAULT_STRATEGY
+    assert set(STRATEGIES.keys()) == {"cost", "latency", "intelligence"}
     assert STRATEGIES["cost"] is COST_STRATEGY
     assert STRATEGIES["latency"] is LATENCY_STRATEGY
+    assert STRATEGIES["intelligence"] is INTELLIGENCE_STRATEGY
 
 
 def test_status_fallback_succeeded_value() -> None:

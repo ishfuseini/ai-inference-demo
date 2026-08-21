@@ -15,6 +15,13 @@ def test_dockerfile_copies_static_assets() -> None:
     assert "COPY assets/ ./assets/" in text
 
 
+def test_dockerfile_installs_dependencies_at_build_time() -> None:
+    text = Path("Dockerfile").read_text()
+    assert "COPY pyproject.toml uv.lock ./" in text
+    assert "RUN uv sync --frozen --no-dev" in text
+    assert 'CMD ["uv", "run", "--no-sync", "python", "app.py"]' in text
+
+
 def test_failure_tree_and_quickstart_paths_resolve() -> None:
     assert Path("docs/failure-tree.md").exists()
     assert Path("docs/specs/failure-tree.md").exists() is False

@@ -6,8 +6,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 WORKDIR /app
 
 # Install dependencies first (cached layer)
-COPY pyproject.toml ./
-RUN uv sync --no-dev
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
 
 # Copy application code
 COPY src/ ./src/
@@ -19,5 +19,5 @@ COPY assets/ ./assets/
 # Expose the port NiceGUI listens on
 EXPOSE 8080
 
-# Run the app — uv runs in the project's virtualenv automatically
-CMD ["uv", "run", "python", "app.py"]
+# Run the app without syncing at startup; dependencies are installed in the image.
+CMD ["uv", "run", "--no-sync", "python", "app.py"]

@@ -161,10 +161,19 @@ body {
 .demo-brand-label {
   font-weight: 600;
   font-size: var(--text-label);
-  line-height: 1.4;
+  line-height: 1.1;
   letter-spacing: 0.04em;
   color: var(--color-ink-secondary);
-  margin-top: var(--space-2);
+  margin-top: 0;
+  text-align: center;
+}
+
+.demo-brand-lockup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
 }
 
 .demo-title-with-logo {
@@ -714,12 +723,51 @@ class SamplePrompt:
 
 SAMPLE_PROMPTS = (
     SamplePrompt(
-        label="Summarize support complaint",
-        prompt="Summarize this customer support message. --- The service is back now, so I am not asking for an immediate fix. But we lost access for nearly two hours, and your support team never acknowledged the issue. I need a written explanation of what happened and how you’ll prevent it from happening again.",
+        label="Draft timeout reply",
+        prompt="Write a concise customer-support reply to this API reliability complaint. Lead by acknowledging the launch-window impact before any explanation. Ask for at least two concrete diagnostics, give a next step with an owner or timeframe, and do not promise this will never happen again.\n\nCustomer message:\nYour API timed out during our launch window and now my team is getting blamed. We need answers. We had three separate windows this morning where calls just hung until our client-side timeout fired at 30s. This was the one day of the quarter we could not afford it. What actually happened?",
     ),
     SamplePrompt(
-        label="Classify security ticket",
-        prompt="Classify this support ticket by severity. -- The security issue appears to have been contained, so I’m not asking you to take emergency action on our account. However, we received no timely notification and had to learn about the incident through another channel. I need a written summary of what happened, what information may have been affected, and what protections are now in place.",
+        label="Handle renewal risk",
+        prompt="Write a concise customer-support reply to this API reliability complaint. Address the renewal risk directly without offering discounts or guarantees. Acknowledge that the earlier resolution failed, ask for the current incident details, and give the customer something concrete they can take to their CTO.\n\nCustomer message:\nThis is the second time in a month. Last time we were told it was investigated and resolved. It clearly wasn't. I have a renewal conversation next week and right now I can't defend keeping you. What do I tell my CTO?",
+    ),
+)
+
+EVAL_SCENARIO = (
+    "Handling API reliability complaints can be complex and time-consuming. Support teams often struggle to triage issues quickly, draft effective responses, and provide actionable feedback to product teams. This slows down resolution times and impacts customer satisfaction."
+    "Imagine an AI assistant that instantly drafts thoughtful, impact-aware support replies—acknowledging customer pain points without defensiveness, requesting clear diagnostics, and offering honest next steps. Ishlab’s demo showcases exactly that, helping support staff move faster and smarter."
+)
+
+EVAL_PROOF=(
+    "Make It Reliable: Watch how routing preferences, fallback strategies, and graceful error handling keep your service steady, even under pressure."
+    "Make It Economical: Understand how different model choices impact cost, latency, and token usage—empowering you to optimize for price-performance balance." 
+    "Make Changes Safely: Evaluate models side-by-side with quality scoring, traceability via Langfuse, and data-driven decision-making to pick the best fit for your need"
+)
+EVAL_DESCRIPTION = (
+    "An angry customer says the API keeps failing and hints they're ready to leave. We score whether the reply holds up."
+    "Leads with the customer's problem — names what they actually lost, before any explanation or caveat."
+    "Asks for real detail — request IDs, timestamps, endpoints. Not 'send more info.'"
+    "Commits to a next step — what happens, who does it, by when."
+    "Promises only what we can keep — no 'this wont happen again, no unauthorized credits."
+    "Doesn't guess at blame — no pointing at the customer's code before the evidence is in."
+    "Gets the scope right — doesn't inflate a hiccup into an outage, or wave off a real one."
+    "Answers the churn signal — addresses 'we are evaluating alternatives' directly, without pleading."
+)
+
+EVAL_SCORING_ROWS = (
+    (
+        "Binary criteria",
+        "ACK, NODEF, DIAG, NEXT, NOGUAR, NOBLAME, SCOPE, RETAIN",
+        "Passes only when every applicable criterion has eviderufnce.",
+    ),
+    (
+        "Tone score",
+        "1-5 judgment for steady, specific, non-template support writing",
+        "Must meet the case's minimum tone target.",
+    ),
+    (
+        "Auto-fail",
+        "Guarantees, unauthorized refunds, blame, or threat-based concessions",
+        "Zeroes the case regardless of other evidence.",
     ),
 )
 
@@ -967,6 +1015,22 @@ def _render_comparison(history: RunHistory) -> None:
                         else:
                             ui.label(value)
                             ui.tooltip(value)
+
+
+def _render_eval_scoring_table() -> None:
+    columns = ("Scoring layer", "What the judge looks for", "Pass/fail meaning")
+    with ui.element("div").classes("demo-grid-scroll").props(
+        'role="table" aria-label="Eval scoring rubric"'
+    ), ui.grid(columns=len(columns)).classes("w-full").style(
+        _content_sized_grid_style(len(columns))
+    ):
+        for column in columns:
+            ui.label(column).classes("demo-grid-header").props('role="columnheader"')
+        for row in EVAL_SCORING_ROWS:
+            for value in row:
+                with ui.element("div").classes("demo-grid-cell").props('role="cell"'):
+                    ui.label(value)
+                    ui.tooltip(value)
 
 
 async def _run_inference(
@@ -1322,6 +1386,7 @@ def build_app(
     stream_fn: StreamFn = stream_chat_completion,
 ) -> None:
     ui.page_title("ishlab Production Inference Lab")
+    ui.add_head_html('<link rel="icon" href="assets/favicon.ico" type="image/x-icon">')
     state = _UIState()
 
     # Mount static assets for avatar and logo
@@ -1404,15 +1469,6 @@ def build_app(
                 config=config,
                 stream_fn=observed_stream,
             )
-        elif simulate_failure.value:
-            run = await _run_fallback_inference(
-                prompt_text,
-                api_key=os.environ.get(OPENROUTER_API_KEY, ""),
-                history=history,
-                fallback_strategy=selected_strategy,
-                stream_fn=observed_stream,
-                config=config,
-            )
         else:
             run = await _run_inference(
                 prompt_text,
@@ -1444,12 +1500,12 @@ def build_app(
     with ui.column().classes("mx-auto w-full max-w-[1280px] gap-6 p-6"):
         ui.add_head_html(_DESIGN_CSS)
 
-        # Header: avatar inline-left of big title, brand label below rule
-        with ui.column().classes("gap-0 w-full"):
-            with ui.row().classes("items-center gap-4"):
+        # Header: compact brand lockup inline-left of big title
+        with ui.column().classes("gap-0 w-full"), ui.row().classes("items-start gap-4"):
+            with ui.column().classes("demo-brand-lockup"):
                 ui.image("/assets/ish-avatar.png").classes("demo-avatar").props('alt=""')
-                _heading("Production Inference Lab", level=1, classes="demo-page-title")
-            ui.label("ishlab").classes("demo-brand-label")
+                ui.label("ishlab").classes("demo-brand-label")
+            _heading("Production Inference Lab", level=1, classes="demo-page-title")
 
         ui.label("The app runs live streaming inference, exposes routing/fallback/cost/latency/cache-or-repeat evidence runs to Langfuse, and runs a three-to-five-case deterministic eval set. ").classes("demo-supporting")
         ui.label("This demo shows what changes when inference becomes something you have to operate in production: routing, fallback, latency, cost, traces, and evals.").classes(
@@ -1463,9 +1519,9 @@ def build_app(
             _status_item(
                 "OpenRouter",
                 config.openrouter_ready,
-                "Export OPENROUTER_API_KEY before live inference."
-                if not config.openrouter_ready
-                else "Required credential is present; value is not displayed.",
+                "Required credential is present; value is not displayed."
+                if config.openrouter_ready
+                else "Export OPENROUTER_API_KEY before live inference.",
             )
             _status_item(
                 "Langfuse tracing",
@@ -1477,9 +1533,16 @@ def build_app(
 
         # Request panel with section dividers
         with ui.card().classes("w-full demo-card"):
-            _heading("Prompt", level=2, classes="demo-component-heading")
+            _heading("Experience how prompt routing, traceability, and evaluation come together", level=1, classes="demo-component-heading")
+            _heading("Prompt Evaluation Scenario", level=3, classes="demo-component-heading")
+            ui.label(EVAL_SCENARIO).classes("demo-body")
+            _heading("Prompt Evaluation Description", level=3, classes="demo-component-heading")
+            ui.label(EVAL_DESCRIPTION).classes("demo-body")
+            _heading("Real-World Scenarios That Prove It Works", level=2, classes="demo-component-heading")
+            ui.label(EVAL_PROOF).classes("demo-body")
+            _heading("Prompt", level=3, classes="demo-component-heading")
             prompt = ui.textarea(
-                placeholder="Ask a production-style question, classification task, or summarization task...",
+                placeholder="Draft or revise a support reply to an API reliability complaint...",
                 on_change=lambda _: sync_run_button(),
             ).classes("w-full").props('aria-label="Prompt"')
             ui.label("Sample prompt").classes("demo-label")
@@ -1513,21 +1576,15 @@ def build_app(
 
             ui.element("div").classes("demo-section-divider")
 
-            with ui.row().classes("w-full gap-8 items-center demo-toggle-row"):
-                with ui.column().classes("gap-1"):
-                    repeat_enabled = ui.switch("Repeat previous prompt", value=False)
-                    ui.label(
-                        "Runs the same prompt twice and reports cache evidence or latency/cost delta."
-                    ).classes("demo-toggle-help")
-                with ui.column().classes("gap-1"):
-                    simulate_failure = ui.switch("Simulate primary route failure", value=False)
-                    ui.label("For a reproducible demo. The UI will label this as simulated.").classes(
-                        "demo-toggle-help"
-                    )
+            with ui.column().classes("gap-1"):
+                repeat_enabled = ui.switch("Repeat previous prompt", value=False)
+                ui.label(
+                    "Runs the same prompt twice and reports cache evidence or latency/cost delta."
+                ).classes("demo-toggle-help")
             run_button = ui.button("Run Inference", on_click=run_request).classes(
                 "demo-btn-primary"
             ).props("unelevated").style("--q-primary: var(--color-accent);")
-            run_button.props("disable")
+            run_button.disable()
 
         # Response panel (full width)
         response_panel()

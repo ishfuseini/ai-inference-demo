@@ -18,6 +18,8 @@ from openrouter_demo.models import (
 )
 from openrouter_demo.routing import COST_STRATEGY, DEFAULT_STRATEGY, LATENCY_STRATEGY, STRATEGIES
 from openrouter_demo.ui import (
+    EVAL_DESCRIPTION,
+    EVAL_SCORING_ROWS,
     FALLBACK_SUCCESS_RESPONSE,
     SAMPLE_PROMPTS,
     STREAMING_RESPONSE,
@@ -844,9 +846,10 @@ def test_run_fallback_inference_appends_to_history() -> None:
 def test_ui_has_no_chatbot_labels() -> None:
     text = Path("src/openrouter_demo/ui.py").read_text()
     for inference_copy in (
-        'ui.page_title("OpenRouter Production Inference Lab")',
-        'ui.label("Route, observe, recover, and evaluate model calls.")',
-        'ui.label("A model call is easy. Operating inference is the real problem.")',
+        'ui.page_title("ishlab Production Inference Lab")',
+        '_heading("Production Inference Lab", level=1, classes="demo-page-title")',
+        "The app runs live streaming inference",
+        "This demo shows what changes when inference becomes something you have to operate",
         'ui.button("Run Inference", on_click=run_request)',
         '"Streaming response"',
         '"Telemetry"',
@@ -872,5 +875,46 @@ def test_sample_prompt_buttons_have_short_labels_and_full_prompts() -> None:
     assert "fill_prompt(sample.prompt)" in text
     assert all(sample.label != sample.prompt for sample in SAMPLE_PROMPTS)
     assert all(len(sample.label) <= 32 for sample in SAMPLE_PROMPTS)
-    assert any("lost access for nearly two hours" in sample.prompt for sample in SAMPLE_PROMPTS)
-    assert any("what information may have been affected" in sample.prompt for sample in SAMPLE_PROMPTS)
+    assert any("launch-window impact" in sample.prompt for sample in SAMPLE_PROMPTS)
+    assert any("at least two concrete diagnostics" in sample.prompt for sample in SAMPLE_PROMPTS)
+    assert any("renewal risk directly" in sample.prompt for sample in SAMPLE_PROMPTS)
+    assert any("something concrete they can take to their CTO" in sample.prompt for sample in SAMPLE_PROMPTS)
+
+
+def test_prompt_panel_describes_eval_rubric() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "ui.label(EVAL_DESCRIPTION)" in text
+    assert "_render_eval_scoring_table()" in text
+    assert "API reliability complaints" in EVAL_DESCRIPTION
+    assert "acknowledge impact" in EVAL_DESCRIPTION
+    assert "request concrete diagnostics" in EVAL_DESCRIPTION
+    assert "offer honest next steps" in EVAL_DESCRIPTION
+    assert any("ACK, NODEF, DIAG, NEXT" in row[1] for row in EVAL_SCORING_ROWS)
+    assert any(row[0] == "Tone score" for row in EVAL_SCORING_ROWS)
+    assert any(row[0] == "Auto-fail" for row in EVAL_SCORING_ROWS)
+    assert "classification task" not in text
+    assert "summarization task" not in text
+
+
+def test_run_button_initial_disabled_state_uses_nicegui_api() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert 'run_button.props("disable")' not in text
+    assert "run_button.disable()" in text
+
+
+def test_brand_label_is_grouped_with_avatar() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert ".demo-brand-lockup" in text
+    assert 'with ui.column().classes("demo-brand-lockup"):' in text
+    assert 'ui.image("/assets/ish-avatar.png").classes("demo-avatar")' in text
+    assert 'ui.label("ishlab").classes("demo-brand-label")' in text
+
+
+def test_prompt_panel_does_not_expose_simulated_failure_option() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    assert "Simulate primary route failure" not in text
+    assert "simulate_failure" not in text

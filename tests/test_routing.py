@@ -2,7 +2,6 @@ from openrouter_demo.models import Status
 from openrouter_demo.routing import (
     COST_STRATEGY,
     DEFAULT_STRATEGY,
-    FALLBACK_PRIMARY_STRATEGY,
     INTELLIGENCE_STRATEGY,
     STRATEGIES,
     strategy_payload,
@@ -24,12 +23,6 @@ def test_cost_strategy_payload_includes_price_sort() -> None:
 def test_intelligence_strategy_payload_has_no_provider_sort() -> None:
     payload = strategy_payload(INTELLIGENCE_STRATEGY)
     assert payload == {"model": "anthropic/claude-opus-5"}
-
-
-def test_fallback_primary_strategy_payload_includes_allow_fallbacks_false() -> None:
-    payload = strategy_payload(FALLBACK_PRIMARY_STRATEGY)
-    assert payload["model"] == "nonexistent/fake-model-for-demo"
-    assert payload["provider"] == {"allow_fallbacks": False}
 
 
 def test_strategies_dict_contains_two_selectable_strategies() -> None:

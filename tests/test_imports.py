@@ -7,7 +7,6 @@ from openrouter_demo.evals import main as evals_main
 from openrouter_demo.models import UNAVAILABLE, Status, Unavailable
 from openrouter_demo.routing import (
     COST_STRATEGY,
-    FALLBACK_PRIMARY_STRATEGY,
     INTELLIGENCE_STRATEGY,
     ROUTING_STRATEGY_LABELS,
     STRATEGIES,
@@ -44,7 +43,6 @@ def test_phase3_types_importable() -> None:
     assert Status.FALLBACK_SUCCEEDED == "fallback_succeeded"
     assert COST_STRATEGY.name == "cost"
     assert INTELLIGENCE_STRATEGY.name == "intelligence"
-    assert FALLBACK_PRIMARY_STRATEGY.name == "custom"
     assert set(STRATEGIES.keys()) == {"cost", "intelligence"}
 
 

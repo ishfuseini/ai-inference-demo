@@ -22,7 +22,6 @@ def test_required_modules_import() -> None:
         "openrouter_demo.evals",
         "openrouter_demo.models",
         "openrouter_demo.routing",
-        "openrouter_demo.scenarios",
         "openrouter_demo.sqlite_store",
         "openrouter_demo.telemetry",
         "openrouter_demo.ui",

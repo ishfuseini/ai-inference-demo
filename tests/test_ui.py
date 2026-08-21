@@ -232,7 +232,7 @@ def test_ui_has_no_chatbot_labels() -> None:
     text = Path("src/openrouter_demo/ui.py").read_text()
     for inference_copy in (
         'ui.page_title("ishlab Production Inference Lab")',
-        '_heading("Production Inference Lab", level=1, classes="demo-page-title")',
+        'ui.html("Production Inference Lab", tag="h1").classes("demo-page-title")',
         "The app runs live streaming inference",
         "This demo shows what changes when inference becomes something you have to operate",
         'ui.button("Run Inference", on_click=run_request)',

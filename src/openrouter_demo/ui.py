@@ -612,10 +612,6 @@ def _strategy_with_model(strategy: RoutingStrategy, model_id: str) -> RoutingStr
     return replace(strategy, model=model_id)
 
 
-def _heading(text: str, *, level: int, classes: str) -> None:
-    ui.html(text, tag=f"h{level}").classes(classes)
-
-
 @dataclass(frozen=True)
 class SamplePrompt:
     label: str
@@ -811,7 +807,7 @@ def build_app(
 
     @ui.refreshable
     def response_panel() -> None:
-        _heading("LLM Response", level=2, classes="demo-section-heading")
+        ui.html("LLM Response", tag="h2").classes("demo-section-heading")
         status_class = "demo-response-status"
         if state.is_running:
             status_class += " demo-response-status--streaming"
@@ -1002,7 +998,7 @@ def build_app(
             with ui.column().classes("demo-brand-lockup"):
                 ui.image("/assets/ish-avatar.png").classes("demo-avatar").props('alt=""')
                 ui.label("ishlab").classes("demo-brand-label")
-            _heading("Production Inference Lab", level=1, classes="demo-page-title")
+            ui.html("Production Inference Lab", tag="h1").classes("demo-page-title")
 
         ui.label(
             "The app runs live streaming inference, exposes routing, cost, latency, token, and trace evidence, and runs a three-to-five-case deterministic eval set. "
@@ -1013,15 +1009,14 @@ def build_app(
 
         # Request panel with section dividers
         with ui.card().classes("w-full demo-card"):
-            _heading(
+            ui.html(
                 "Prompt routing, traceability, and evaluation come together for meaningful production inference",
-                level=3,
-                classes="text-section-heading",
-            )
-            _heading("Prompt Evaluation Scenario", level=5, classes="text-section-heading")
+                tag="h3",
+            ).classes("text-section-heading")
+            ui.html("Prompt Evaluation Scenario", tag="h5").classes("text-section-heading")
             # ui.html preserves the \n line breaks via whitespace-pre-line
             ui.html(EVAL_SCENARIO).classes("demo-body").style("white-space: pre-line;")
-            _heading("Prompt Evaluation", level=5, classes="text-section-heading")
+            ui.html("Prompt Evaluation", tag="h5").classes("text-section-heading")
             ui.html(EVAL_DESCRIPTION).classes("demo-body").style("white-space: pre-line;")
 
         def _status_item(label: str, ready: bool, detail: str) -> None:
@@ -1059,7 +1054,7 @@ def build_app(
 
         with ui.row().classes("w-full items-stretch gap-6 flex-wrap"):
             with ui.card().classes("flex-1 demo-card demo-prompt-card"):
-                _heading("Prompt", level=2, classes="demo-section-heading")
+                ui.html("Prompt", tag="h2").classes("demo-section-heading")
                 prompt = (
                     ui.textarea(
                         placeholder="Draft or revise a support reply to an API reliability complaint...",
@@ -1080,7 +1075,7 @@ def build_app(
 
                     ui.element("div").classes("demo-section-divider")
 
-                _heading("Strategy", level=2, classes="demo-component-heading")
+                ui.html("Strategy", tag="h2").classes("demo-component-heading")
                 strategy_select = (
                     ui.radio(
                         options={
@@ -1121,7 +1116,7 @@ def build_app(
                 response_panel()
 
         with ui.card().classes("w-full demo-card demo-scores-card"):
-            _heading(
-                "Evaluation Scores", level=2, classes="demo-section-heading demo-scores-heading"
-            )
+            ui.html(
+                "Evaluation Scores", tag="h2"
+            ).classes("demo-section-heading demo-scores-heading")
             eval_scores_panel()

@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 from openrouter_demo.client import (
-    OpenRouterHTTPError,
+    OpenRouterError,
     stream_chat_completion,
 )
 from openrouter_demo.models import UNAVAILABLE, StreamChunk, StreamedResult, Unavailable
@@ -164,7 +164,7 @@ def test_stream_401_raises_auth_error() -> None:
         ):
             pass
 
-    with pytest.raises(OpenRouterHTTPError):
+    with pytest.raises(OpenRouterError):
         asyncio.run(_run())
 
 
@@ -253,6 +253,6 @@ def test_stream_preserves_partial_text_on_error_payload() -> None:
             if isinstance(item, StreamChunk):
                 pass
 
-    with pytest.raises(OpenRouterHTTPError) as exc:
+    with pytest.raises(OpenRouterError) as exc:
         asyncio.run(_run())
     assert exc.value.partial_text == "partial"

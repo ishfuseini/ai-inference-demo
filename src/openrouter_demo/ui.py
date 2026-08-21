@@ -44,10 +44,6 @@ from openrouter_demo.telemetry import (
 type StreamFn = Callable[..., AsyncIterator[StreamChunk | StreamedResult]]
 
 
-_UNAVAILABLE_COPY = "Unavailable from selected route/provider."
-_COST_UNAVAILABLE_COPY = "Cost metadata was not returned for this route/provider."
-_LATENCY_UNAVAILABLE_COPY = "Latency was not returned for this route/provider."
-
 STRATEGY_MODELS: dict[str, str] = {
     "cost": "openai/gpt-oss-20b:free",
     "intelligence": "anthropic/claude-opus-5",

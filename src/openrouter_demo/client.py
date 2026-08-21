@@ -18,10 +18,6 @@ class OpenRouterError(Exception):
         self.partial_text = partial_text
 
 
-class OpenRouterHTTPError(OpenRouterError):
-    pass
-
-
 def _delta_content(payload: dict) -> str | None:
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices:
@@ -149,12 +145,12 @@ async def stream_chat_completion(
             ) as response:
                 if response.status_code == 401:
                     partial = "".join(text_parts)
-                    raise OpenRouterHTTPError(
+                    raise OpenRouterError(
                         f"OpenRouter auth failed ({response.status_code})", partial_text=partial
                     )
                 if response.status_code >= 400:
                     partial = "".join(text_parts)
-                    raise OpenRouterHTTPError(
+                    raise OpenRouterError(
                         f"OpenRouter request failed ({response.status_code})",
                         partial_text=partial,
                     )
@@ -175,7 +171,7 @@ async def stream_chat_completion(
                         err_obj = err if isinstance(err, dict) else {"message": str(err) if err is not None else None}
                         msg = err_obj.get("message")
                         partial = "".join(text_parts)
-                        raise OpenRouterHTTPError(
+                        raise OpenRouterError(
                             str(msg) if msg else "OpenRouter error",
                             partial_text=partial,
                         )
@@ -221,10 +217,10 @@ async def stream_chat_completion(
             raise
         except httpx.TimeoutException as exc:
             partial = "".join(text_parts)
-            raise OpenRouterHTTPError(f"OpenRouter request timed out: {exc}", partial_text=partial) from exc
+            raise OpenRouterError(f"OpenRouter request timed out: {exc}", partial_text=partial) from exc
         except httpx.HTTPError as exc:
             partial = "".join(text_parts)
-            raise OpenRouterHTTPError(str(exc), partial_text=partial) from exc
+            raise OpenRouterError(str(exc), partial_text=partial) from exc
 
         latency_ms = int((time.monotonic() - start) * 1000)
         full_text = "".join(text_parts)

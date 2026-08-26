@@ -1,0 +1,17 @@
+## 1. Reshape the strategy-model data in `src/openrouter_demo/ui.py`
+
+- [x] 1.1 Change `STRATEGY_MODELS` from `dict[str, str]` to `dict[str, list[str]]` with `cost: [deepseek/deepseek-v4-flash-0731, inclusionai/ling-3.0-flash, upstage/solar-pro4]` and `intelligence: [anthropic/claude-opus-5, z-ai/glm-5.2, deepseek/deepseek-v4-pro]`; verify by reading the dict back from `src/openrouter_demo/ui.py` (around line 51) and confirming the new shape and all six ids are present.
+- [x] 1.2 Add the four new short-name entries to `STRATEGY_MODEL_SHORT_NAMES` — `inclusionai/ling-3.0-flash: ling-3.0-flash`, `upstage/solar-pro4: solar-pro4`, `z-ai/glm-5.2: glm-5.2`, `deepseek/deepseek-v4-pro: deepseek-v4-pro` — leaving the two existing entries intact; verify by reading the dict back from `src/openrouter_demo/ui.py` (around line 56) and confirming all six keys are present.
+- [x] 1.3 Simplify the strategy radio option expression (around line 1103) from `{s.name: f"{ROUTING_STRATEGY_LABELS[s.name]}: {STRATEGY_MODEL_SHORT_NAMES[STRATEGY_MODELS[s.name]]}" for s in STRATEGIES.values()}` to `{s.name: ROUTING_STRATEGY_LABELS[s.name] for s in STRATEGIES.values()}`; verify by reading the line back from `src/openrouter_demo/ui.py` and confirming the new short expression is present and the model-short-name lookup is gone.
+
+## 2. Add the model picker to the strategy card in `src/openrouter_demo/ui.py`
+
+- [x] 2.1 Add a `ui.select` (label "Model") directly below the strategy radio on the strategy card, populated from `STRATEGY_MODELS[selected_strategy.name]` and using short names for option labels; verify by reading the surrounding block back from `src/openrouter_demo/ui.py` and confirming the picker is created with a value matching `STRATEGY_MODELS[initial_strategy_name][0]`.
+- [x] 2.2 Extend `update_strategy_display` so that when the strategy radio changes, the model picker's options are repopulated from the new strategy's list and its value resets to that list's first entry; verify by reading the function back from `src/openrouter_demo/ui.py` and confirming the `model_select` options and value are both reassigned inside the handler.
+- [x] 2.3 Update the `model_id = …` line inside `run_request` (around line 959) from `model_id = STRATEGY_MODELS[selected_strategy.name]` to `model_id = model_select.value or STRATEGY_MODELS[selected_strategy.name][0]`; verify by reading the line back from `src/openrouter_demo/ui.py` and confirming the new fallback expression is in place.
+
+## 3. Update and add tests in `tests/test_ui.py`
+
+- [x] 3.1 Update `test_strategy_models_are_hard_coded_by_strategy` to assert the new list shape (3 models per strategy in the agreed display order) and add a sibling assertion that `set(STRATEGY_MODEL_SHORT_NAMES)` is a superset of every model id in `STRATEGY_MODELS`; verify by running `uv run pytest tests/test_ui.py::test_strategy_models_are_hard_coded_by_strategy` and confirming it passes.
+- [x] 3.2 Add a new test `test_model_picker_defaults_to_first_option_per_strategy` that drives the strategy select through both strategies and asserts the model picker's default value is the first option in each list; verify by running `uv run pytest tests/test_ui.py::test_model_picker_defaults_to_first_option_per_strategy` and confirming it passes.
+- [x] 3.3 Run the full UI test file with `uv run pytest tests/test_ui.py` and confirm that, aside from the known pre-existing failure of `test_ui_has_no_chatbot_labels` (unrelated to this change), every other test in the file passes.

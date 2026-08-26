@@ -20,6 +20,7 @@ from openrouter_demo.ui import (
     EVAL_DESCRIPTION,
     SAMPLE_PROMPTS,
     STRATEGY_MODELS,
+    STRATEGY_MODEL_SHORT_NAMES,
     _html_escape,
     _run_inference,
     _strategy_with_model,
@@ -164,10 +165,49 @@ def test_strategy_with_model_preserves_routing_preferences() -> None:
 
 def test_strategy_models_are_hard_coded_by_strategy() -> None:
     assert STRATEGY_MODELS == {
-        "cost": "openai/gpt-oss-20b:free",
-        "intelligence": "anthropic/claude-opus-5",
+        "cost": [
+            "deepseek/deepseek-v4-flash-0731",
+            "inclusionai/ling-3.0-flash",
+            "upstage/solar-pro4",
+        ],
+        "intelligence": [
+            "anthropic/claude-opus-5",
+            "z-ai/glm-5.2",
+            "deepseek/deepseek-v4-pro",
+        ],
     }
     assert set(STRATEGY_MODELS) == set(STRATEGIES)
+    assert set(STRATEGY_MODEL_SHORT_NAMES).issuperset(
+        {m for models in STRATEGY_MODELS.values() for m in models}
+    )
+
+
+def test_model_picker_defaults_to_first_option_per_strategy() -> None:
+    text = Path("src/openrouter_demo/ui.py").read_text()
+
+    initial_strategy_name = next(iter(STRATEGIES))
+    initial_first_model = STRATEGY_MODELS[initial_strategy_name][0]
+
+    # The model picker (ui.select, label "Model") is created on the strategy
+    # card, populated from STRATEGY_MODELS[initial_strategy_name], and defaults
+    # to that list's first entry.
+    assert 'ui.select(' in text
+    assert 'label="Model"' in text
+    assert "STRATEGY_MODELS[initial_strategy_name]" in text
+    assert f"value=initial_strategy_models[0]" in text
+    assert initial_first_model in text  # first option is reachable from default
+
+    # When the strategy radio changes, update_strategy_display must repopulate
+    # the picker's options from the new strategy and reset its value to the
+    # first entry of that strategy's list.
+    assert "model_select.options = {" in text
+    assert "STRATEGY_MODELS[selected.name]" in text
+    assert "model_select.value = new_models[0]" in text
+    assert "model_select.update()" in text
+
+    # run_request reads from the picker first, with a defensive fallback to
+    # the first model in the active strategy's list.
+    assert "model_id = model_select.value or STRATEGY_MODELS[selected_strategy.name][0]" in text
 
 
 def test_run_inference_without_config_skips_tracing() -> None:

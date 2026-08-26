@@ -48,14 +48,26 @@ _UNAVAILABLE_COPY = "Unavailable from selected route/provider."
 _COST_UNAVAILABLE_COPY = "Cost metadata was not returned for this route/provider."
 _LATENCY_UNAVAILABLE_COPY = "Latency was not returned for this route/provider."
 
-STRATEGY_MODELS: dict[str, str] = {
-    "cost": "openai/gpt-oss-20b:free",
-    "intelligence": "anthropic/claude-opus-5",
+STRATEGY_MODELS: dict[str, list[str]] = {
+    "cost": [
+        "deepseek/deepseek-v4-flash-0731",
+        "inclusionai/ling-3.0-flash",
+        "upstage/solar-pro4",
+    ],
+    "intelligence": [
+        "anthropic/claude-opus-5",
+        "z-ai/glm-5.2",
+        "deepseek/deepseek-v4-pro",
+    ],
 }
 
 STRATEGY_MODEL_SHORT_NAMES: dict[str, str] = {
-    "openai/gpt-oss-20b:free": "gpt-oss-20b",
+    "deepseek/deepseek-v4-flash-0731": "deepseek-v4-flash",
     "anthropic/claude-opus-5": "claude-opus-5",
+    "inclusionai/ling-3.0-flash": "ling-3.0-flash",
+    "upstage/solar-pro4": "solar-pro4",
+    "z-ai/glm-5.2": "glm-5.2",
+    "deepseek/deepseek-v4-pro": "deepseek-v4-pro",
 }
 
 
@@ -956,7 +968,7 @@ def build_app(
             return
         prompt_text = str(prompt.value or "").strip()
         selected_strategy = STRATEGIES.get(strategy_select.value, INTELLIGENCE_STRATEGY)
-        model_id = STRATEGY_MODELS[selected_strategy.name]
+        model_id = model_select.value or STRATEGY_MODELS[selected_strategy.name][0]
         if not prompt_text or not model_id:
             sync_run_button()
             return
@@ -1100,7 +1112,7 @@ def build_app(
                 strategy_select = (
                     ui.radio(
                         options={
-                            s.name: f"{ROUTING_STRATEGY_LABELS[s.name]}: {STRATEGY_MODEL_SHORT_NAMES[STRATEGY_MODELS[s.name]]}"
+                            s.name: ROUTING_STRATEGY_LABELS[s.name]
                             for s in STRATEGIES.values()
                         },
                         value=initial_strategy_name,
@@ -1113,9 +1125,28 @@ def build_app(
                     STRATEGIES[initial_strategy_name].description
                 ).classes("demo-strategy-desc")
 
+                initial_strategy_models = STRATEGY_MODELS[initial_strategy_name]
+                model_select = (
+                    ui.select(
+                        options={
+                            m: STRATEGY_MODEL_SHORT_NAMES[m] for m in initial_strategy_models
+                        },
+                        label="Model",
+                        value=initial_strategy_models[0],
+                    )
+                    .props('aria-label="Routing model"')
+                    .classes("demo-model-select")
+                )
+
                 def update_strategy_display(_: object) -> None:
                     selected = STRATEGIES.get(strategy_select.value, INTELLIGENCE_STRATEGY)
                     strategy_description_label.text = selected.description
+                    new_models = STRATEGY_MODELS[selected.name]
+                    model_select.options = {
+                        m: STRATEGY_MODEL_SHORT_NAMES[m] for m in new_models
+                    }
+                    model_select.value = new_models[0]
+                    model_select.update()
                     sync_run_button()
 
                 strategy_select.on("update:model-value", update_strategy_display)
